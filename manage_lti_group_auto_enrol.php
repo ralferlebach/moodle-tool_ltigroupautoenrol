@@ -19,8 +19,9 @@
  *
  * Params page for auto group enrollment as defined by Comete
  *
- * @package    tool_groupautoenrol
- * @copyright  2016 Pascal
+ * @package    tool_ltigroupautoenrol
+ * @copyright  2024 ralferlebach
+ * upon tool_groupautoenrol by Pascal
  * @author     Pascal M - https://github.com/pascal-my
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
