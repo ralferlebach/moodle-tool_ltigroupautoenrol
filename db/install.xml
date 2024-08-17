@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<XMLDB PATH="admin/tool/ltigroupautoenrol/db" VERSION="20240404" COMMENT="XMLDB file for Moodle admin/tool/groupautoenrol"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:noNamespaceSchemaLocation="../../../../lib/xmldb/xmldb.xsd"
+>
+  <TABLES>
+    <TABLE NAME="tool_ltigroupautoenrol" COMMENT="tool_groupautoenrol table.">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="courseid" TYPE="int" LENGTH="11" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Id of the course"/>
+        <FIELD NAME="enable_enrol" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Active or not the plugin for each course"/>
+        <FIELD NAME="rolelist" TYPE="char" LENGTH="255" NOTNULL="false" DEFAULT="5" SEQUENCE="false" COMMENT="rolelist"/>
+        <FIELD NAME="enrol_method" TYPE="int" LENGTH="3" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="enrolment method"/>
+        <FIELD NAME="profile_field" TYPE="int" LENGTH="3" NOTNULL="false" DEFAULT="0" SEQUENCE="false" COMMENT="profil field"/>
+        <FIELD NAME="use_groupslist" TYPE="int" LENGTH="1" NOTNULL="false" DEFAULT="0" SEQUENCE="false" COMMENT="use specific(s) group(s) only"/>
+        <FIELD NAME="groupslist" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="Groups to use"/>
+        <FIELD NAME="balises" TYPE="char" LENGTH="255" NOTNULL="false" SEQUENCE="false" COMMENT="Balises for letters"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
+    </TABLE>
+  </TABLES>
+</XMLDB>
