@@ -19,25 +19,25 @@
  *
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  *
- * @package   tool_groupautoenrol
+ * @package   tool_ltigroupautoenrol
  * @copyright 04/04/2024 Mfreak.nl | LdesignMedia.nl - Luuk Verhoeven
  * @author    Luuk Verhoeven
  **/
 
 /**
- * xmldb_tool_groupautoenrol_upgrade
+ * xmldb_tool_ltigroupautoenrol_upgrade
  *
  * @param int $oldversion
  * @return bool true
  */
-function xmldb_tool_groupautoenrol_upgrade(int $oldversion): bool {
+function xmldb_tool_ltigroupautoenrol_upgrade(int $oldversion): bool {
 
     global $DB;
     $dbman = $DB->get_manager();
 
     if ($oldversion < 2024040400) {
 
-        // Changing type of field groupslist on table tool_groupautoenrol to text.
+        // Changing type of field groupslist on table tool_ltigroupautoenrol to text.
         $table = new xmldb_table('tool_ltigroupautoenrol');
         $field = new xmldb_field('groupslist', XMLDB_TYPE_TEXT, null, null, null, null, null, 'use_groupslist');
 

@@ -4,7 +4,7 @@
        xsi:noNamespaceSchemaLocation="../../../../lib/xmldb/xmldb.xsd"
 >
   <TABLES>
-    <TABLE NAME="tool_ltigroupautoenrol" COMMENT="tool_groupautoenrol table.">
+    <TABLE NAME="tool_ltigroupautoenrol" COMMENT="tool_ltigroupautoenrol table.">
       <FIELDS>
         <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
         <FIELD NAME="courseid" TYPE="int" LENGTH="11" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Id of the course"/>

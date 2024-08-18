@@ -16,13 +16,13 @@
 /**
  * Manage form
  *
- * @package    tool_groupautoenrol
+ * @package    tool_ltigroupautoenrol
  * @copyright  2016 Pascal
  * @author     Pascal M - https://github.com/pascal-my
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-namespace tool_groupautoenrol\form;
+namespace tool_ltigroupautoenrol\form;
 
 use html_writer;
 use moodle_url;
@@ -36,12 +36,12 @@ require_once("$CFG->libdir/formslib.php");
 /**
  * Class manage_auto_group_enrol_form
  *
- * @package    tool_groupautoenrol
+ * @package    tool_ltigroupautoenrol
  * @copyright  2016 Pascal
  * @author     Pascal M - https://github.com/pascal-my
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class manage_auto_group_enrol_form extends moodleform {
+class manage_lti_group_auto_enrol_form extends moodleform {
 
     /**
      * Definition
@@ -65,6 +65,7 @@ class manage_auto_group_enrol_form extends moodleform {
         $mform = &$this->_form;
         $course = $this->_customdata['course'];
         $allgroupscourse = groups_get_all_groups($course->id);
+        $allltideployments = groups_get_all_groups($course->id);
 
         $mform->addElement('header', 'enrol', get_string('settings'));
 
@@ -74,24 +75,24 @@ class manage_auto_group_enrol_form extends moodleform {
             $groupurl = new moodle_url('/group/index.php', ['id' => $course->id]);
             $link = html_writer::link(
                 $groupurl,
-                get_string('auto_group_enrol_form_no_group_found', 'tool_groupautoenrol')
+                get_string('auto_group_enrol_form_no_group_found', 'tool_ltigroupautoenrol')
             );
             $mform->addElement('static', 'no_group_found', '', $link);
 
             return;
         }
 
-        $instance = $DB->get_record('tool_groupautoenrol', ['courseid' => $course->id]);
+        $instance = $DB->get_record('tool_ltigroupautoenrol', ['courseid' => $course->id]);
         $mform->addElement(
             'checkbox',
             'enable_enrol',
-            get_string('auto_group_form_enable_enrol', 'tool_groupautoenrol')
+            get_string('auto_group_form_enable_enrol', 'tool_ltigroupautoenrol')
         );
 
         $mform->addElement(
             'checkbox',
             'use_groupslist',
-            get_string('auto_group_form_usegroupslist', 'tool_groupautoenrol')
+            get_string('auto_group_form_usegroupslist', 'tool_ltigroupautoenrol')
         );
         $mform->disabledIf('use_groupslist', 'enable_enrol');
 
@@ -103,7 +104,7 @@ class manage_auto_group_enrol_form extends moodleform {
         $select = $mform->addElement(
             'select',
             'groupslist',
-            get_string('auto_group_form_groupslist', 'tool_groupautoenrol'),
+            get_string('auto_group_form_groupslist', 'tool_ltigroupautoenrol'),
             $fields
         );
         $select->setMultiple(true);

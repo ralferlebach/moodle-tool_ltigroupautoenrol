@@ -16,7 +16,7 @@
 /**
  * Lib functions
  *
- * @package    tool_groupautoenrol
+ * @package    tool_ltigroupautoenrol
  * @copyright  2016 Pascal
  * @author     Pascal M - https://github.com/pascal-my
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -47,6 +47,7 @@ function tool_ltigroupautoenrol_extend_navigation_course(navigation_node $naviga
         ['id' => $context->instanceid]
     );
     $usermenu = $navigation->get('users');
+    # $usermenu = $usermenu->get('groups');
 
     $usermenu->add(get_string('menu_auto_groups', 'tool_ltigroupautoenrol'), $url);
 }

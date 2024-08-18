@@ -16,7 +16,7 @@
 /**
  * Observers declaration
  *
- * @package    tool_groupautoenrol
+ * @package    tool_ltigroupautoenrol
  * @copyright  2016 Pascal
  * @author     Pascal M - https://github.com/pascal-my
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later

@@ -19,7 +19,7 @@
  *
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  *
- * @package   tool_groupautoenrol
+ * @package   tool_ltigroupautoenrol
  * @copyright 23/07/2020 Mfreak.nl | LdesignMedia.nl - Luuk Verhoeven
  * @author    Luuk Verhoeven
  **/
@@ -31,7 +31,7 @@ namespace local_commander\privacy;
  *
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  *
- * @package   tool_groupautoenrol
+ * @package   tool_ltigroupautoenrol
  * @copyright 23/07/2020 Mfreak.nl | LdesignMedia.nl - Luuk Verhoeven
  * @author    Luuk Verhoeven
  **/

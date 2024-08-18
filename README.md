@@ -1,4 +1,4 @@
-# Moodle-admin_tool_groupautoenrol
+# Moodle-admin_tool_ltigroupautoenrol
 
 Version 4.4.0 (stable version) for Moodle 3.9.0 to 4.4
 
@@ -14,20 +14,21 @@ Plugin to randomly auto enrol students in Moodle courses groups when they are en
 - you can choose to auto-enrol students in all existing course or specific ones
 
 ## Compatibility :
-- Tested with Moodle 3.9, Moodle 4.2, Moodle 4.3 and Moodle 4.4
+- Tested with Moodle 4.4
 - Another version of the plugin exist and works with Moodle 2.5 and 2.7 (I did not test it with the others versions but should work with all 2.x).
 It's a local plugin because adding link into "Course administration" menu was not possible for admin tool before Moodle 3.0
 You can get it here : https://github.com/pascal-my/moodle-local_groupautoenrol/tree/STABLE
 
 # Installation
-* Copy the directory 'groupautoenrol' into the `moodledir/admin/tool` directory.
+* Copy the directory 'ltigroupautoenrol' into the `moodledir/admin/tool` directory.
 * Connect to moodle as an administrator and install the plugin.
 * Go to a course, create at least one group
 * Enable the plugin for the course with the new link "Course administration > Users > Auto-enrol in groups"
 Note : this link appears even if the plugin is not enabled for the course
 
 # Credits
-* @copyright  2016 Pascal
+* @copyright  2024 ralferlebach
+* @author     Ralf Erlebach -ttps://github.com/ralferlebach
 * @author     Pascal M - https://github.com/pascal-my
 * @author     Luuk Verhoeven - https://github.com/luukverhoeven
 

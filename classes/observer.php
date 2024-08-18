@@ -15,9 +15,9 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Event observers used in tool_groupautoenrol.
+ * Event observers used in tool_ltigroupautoenrol.
  *
- * @package    tool_groupautoenrol
+ * @package    tool_ltigroupautoenrol
  * @copyright  2016 Pascal
  * @author     Pascal M - https://github.com/pascal-my
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -26,9 +26,9 @@
 use core\event\user_enrolment_created;
 
 /**
- * Event observer for tool_groupautoenrol.
+ * Event observer for tool_ltigroupautoenrol.
  *
- * @package    tool_groupautoenrol
+ * @package    tool_ltigroupautoenrol
  * @copyright  2016 Pascal
  * @author     Pascal M - https://github.com/pascal-my
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -49,7 +49,7 @@ class tool_ltigroupautoenrol_observer {
         global $CFG, $DB;
         require_once($CFG->dirroot . '/group/lib.php');
         $enroldata = $event->get_record_snapshot($event->objecttable, $event->objectid);
-        $groupautoenrol = $DB->get_record('tool_groupautoenrol', ['courseid' => $event->courseid]);
+        $groupautoenrol = $DB->get_record('tool_ltigroupautoenrol', ['courseid' => $event->courseid]);
 
         if (empty($groupautoenrol->enable_enrol)) {
             return true;

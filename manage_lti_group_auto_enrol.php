@@ -21,7 +21,7 @@
  *
  * @package    tool_ltigroupautoenrol
  * @copyright  2024 ralferlebach
- * upon tool_groupautoenrol by Pascal
+ * upon tool_ltigroupautoenrol by Pascal
  * @author     Pascal M - https://github.com/pascal-my
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -30,23 +30,23 @@ require_once('../../../config.php');
 defined('MOODLE_INTERNAL') || die;
 
 $id = required_param('id', PARAM_INT);
-$url = new moodle_url('/admin/tool/groupautoenrol/manage_auto_group_enrol.php', ['id' => $id]);
+$url = new moodle_url('/admin/tool/ltigroupautoenrol/manage_lti_group_auto_enrol.php', ['id' => $id]);
 $PAGE->set_url($url);
 
 // TODO we need to gracefully shutdown if course not found.
 $course = $DB->get_record('course', ['id' => $id], '*', MUST_EXIST);
-$context = context_course::instance($course->id);
+# REMOVE? $context = context_course::instance($course->id);
 
 require_login($course);
 
 $coursecontext = context_course::instance($course->id);
 require_capability('moodle/course:update', $coursecontext);
 
-$PAGE->set_context($context);
+$PAGE->set_context($coursecontext);
 $PAGE->set_pagelayout('admin');
 $PAGE->set_heading($course->fullname);
 
-$form = new \tool_groupautoenrol\form\manage_auto_group_enrol_form($url, [
+$form = new \tool_ltigroupautoenrol\form\manage_lti_group_auto_enrol_form($url, [
     'course' => $course,
 ]);
 
@@ -71,22 +71,22 @@ if ($form->is_cancelled()) {
         $groupautoenrol->groupslist = implode(",", $data->groupslist);
     }
 
-    $record = $DB->get_record('tool_groupautoenrol', ['courseid' => $course->id], 'id');
+    $record = $DB->get_record('tool_ltigroupautoenrol', ['courseid' => $course->id], 'id');
     if (!$record) {
-        $DB->insert_record('tool_groupautoenrol', $groupautoenrol);
+        $DB->insert_record('tool_ltigroupautoenrol', $groupautoenrol);
     } else {
         $groupautoenrol->id = $record->id;
-        $DB->update_record('tool_groupautoenrol', $groupautoenrol);
+        $DB->update_record('tool_ltigroupautoenrol', $groupautoenrol);
     }
 
     redirect(
-        new moodle_url('/admin/tool/groupautoenrol/manage_auto_group_enrol.php',
+        new moodle_url('/admin/tool/ltigroupautoenrol/manage_lti_group_auto_enrol.php',
             ['id' => $course->id]
         )
     );
 }
 
 echo $OUTPUT->header();
-echo $OUTPUT->heading(get_string('auto_group_form_page_title', 'tool_groupautoenrol'));
+echo $OUTPUT->heading(get_string('auto_group_form_page_title', 'tool_ltigroupautoenrol'));
 echo $form->render();
 echo $OUTPUT->footer();
