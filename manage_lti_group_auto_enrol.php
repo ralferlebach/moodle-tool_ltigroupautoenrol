@@ -27,14 +27,15 @@
  */
 
 require_once('../../../config.php');
+
 defined('MOODLE_INTERNAL') || die;
 
-$id = required_param('id', PARAM_INT);
-$url = new moodle_url('/admin/tool/ltigroupautoenrol/manage_lti_group_auto_enrol.php', ['id' => $id]);
+$courseid = required_param('id', PARAM_INT);
+$url = new moodle_url('/admin/tool/ltigroupautoenrol/manage_lti_group_auto_enrol.php', ['id' => $courseid]);
 $PAGE->set_url($url);
 
 // TODO we need to gracefully shutdown if course not found.
-$course = $DB->get_record('course', ['id' => $id], '*', MUST_EXIST);
+$course = $DB->get_record('course', ['id' => $courseid], '*', MUST_EXIST);
 # REMOVE? $context = context_course::instance($course->id);
 
 require_login($course);
@@ -87,6 +88,12 @@ if ($form->is_cancelled()) {
 }
 
 echo $OUTPUT->header();
+
+
 echo $OUTPUT->heading(get_string('auto_group_form_page_title', 'tool_ltigroupautoenrol'));
+
+echo "<br><br>Anzahl der Deployments für diesen Kurs: ".(\enrol_lti\helper::count_lti_tools(array('courseid' => $courseid, 'ltiversion' => 'LTI-1p3')))."<br>";
+
+
 echo $form->render();
 echo $OUTPUT->footer();
