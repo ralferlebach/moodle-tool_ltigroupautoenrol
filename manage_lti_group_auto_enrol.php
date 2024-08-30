@@ -26,6 +26,7 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+use \enrol_lti\helper;
 require_once('../../../config.php');
 
 defined('MOODLE_INTERNAL') || die;
@@ -92,7 +93,7 @@ echo $OUTPUT->header();
 
 echo $OUTPUT->heading(get_string('auto_group_form_page_title', 'tool_ltigroupautoenrol'));
 
-echo "<br><br>Anzahl der Deployments für diesen Kurs: ".(\enrol_lti\helper::count_lti_tools(array('courseid' => $courseid, 'ltiversion' => 'LTI-1p3')))."<br>";
+echo "<br><br>Anzahl der Deployments für diesen Kurs: ".(count_lti_tools(array('courseid' => $courseid, 'ltiversion' => 'LTI-1p3')))."<br>";
 
 
 echo $form->render();
