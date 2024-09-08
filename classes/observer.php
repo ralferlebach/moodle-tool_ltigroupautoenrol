@@ -57,12 +57,12 @@ class tool_ltigroupautoenrol_observer {
 
         // Winky wonky dirty hacky macky code... Should be replaced soon!
 
-        $array = [19 => 70
+        $array = [19 => 70,
         20 => 68,
         21 => 69,
         ];
 
-        foreach ($array AS $toolid => $groupid) {
+        foreach ($array as $toolid => $groupid) {
             $sql = "
                 INSERT INTO {groups_members} (groupid, userid, timeadded)
                 SELECT $groupid groupid, userid userid, UNIX_TIMESTAMP(NOW()) timeadded
