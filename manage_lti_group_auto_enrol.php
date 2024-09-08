@@ -26,7 +26,7 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-use \enrol_lti\helper;
+use enrol_lti\helper;
 require_once('../../../config.php');
 
 defined('MOODLE_INTERNAL') || die;
@@ -37,7 +37,6 @@ $PAGE->set_url($url);
 
 // TODO we need to gracefully shutdown if course not found.
 $course = $DB->get_record('course', ['id' => $courseid], '*', MUST_EXIST);
-# REMOVE? $context = context_course::instance($course->id);
 
 require_login($course);
 
@@ -93,7 +92,9 @@ echo $OUTPUT->header();
 
 echo $OUTPUT->heading(get_string('auto_group_form_page_title', 'tool_ltigroupautoenrol'));
 
-echo "<br><br>Anzahl der Deployments für diesen Kurs: ".(count_lti_tools(array('courseid' => $courseid, 'ltiversion' => 'LTI-1p3')))."<br>";
+echo "<br><br>Anzahl der Deployments für diesen Kurs: ".(count_lti_tools(['courseid' => $courseid,
+    'ltiversion' => 'LTI-1p3'],
+    ))."<br>";
 
 
 echo $form->render();

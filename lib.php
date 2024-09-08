@@ -13,6 +13,7 @@
 //
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+
 /**
  * Lib functions
  *
@@ -47,7 +48,7 @@ function tool_ltigroupautoenrol_extend_navigation_course(navigation_node $naviga
         ['id' => $context->instanceid]
     );
     $usermenu = $navigation->get('users');
-    # $usermenu = $usermenu->get('groups');
+    // Geht vermutlich nich: $usermenu = $usermenu->get('groups');
 
     $usermenu->add(get_string('menu_auto_groups', 'tool_ltigroupautoenrol'), $url);
 }
