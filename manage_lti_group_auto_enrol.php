@@ -92,7 +92,7 @@ echo $OUTPUT->header();
 
 echo $OUTPUT->heading(get_string('auto_group_form_page_title', 'tool_ltigroupautoenrol'));
 
-echo "<br><br>Anzahl der Deployments für diesen Kurs: ".(count_lti_tools(['courseid' => $courseid,
+echo "<br><br>Anzahl der Deployments für diesen Kurs: ".(\enrol_lti\helper::count_lti_tools(['courseid' => $courseid,
     'ltiversion' => 'LTI-1p3'],
     ))."<br>";
 
