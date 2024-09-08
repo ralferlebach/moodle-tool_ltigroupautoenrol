@@ -25,14 +25,6 @@
 
 use core\event\user_enrolment_created;
 
-/**
- * Event observer for tool_ltigroupautoenrol.
- *
- * @package    tool_ltigroupautoenrol
- * @copyright  2016 Pascal
- * @author     Pascal M - https://github.com/pascal-my
- * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- */
 class tool_ltigroupautoenrol_observer {
 
     /**
@@ -64,7 +56,7 @@ class tool_ltigroupautoenrol_observer {
                 SELECT $groupid groupid, userid userid, UNIX_TIMESTAMP(NOW()) timeadded
                 FROM {enrol_lti_users} ltiuser
                 WHERE toolid = $toolid
-                AND userid NOT IN (SELECT userid FROM {groups_members} WHERE groupid = $groupid);";
+                AND userid NOT IN (SELECT userid FROM {groups_members} WHERE groupid = $groupid)";
 
             $sqlresult = $DB->execute($sql);
         }
