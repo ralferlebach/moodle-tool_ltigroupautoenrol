@@ -51,10 +51,6 @@ class tool_ltigroupautoenrol_observer {
         $enroldata = $event->get_record_snapshot($event->objecttable, $event->objectid);
         $groupautoenrol = $DB->get_record('tool_ltigroupautoenrol', ['courseid' => $event->courseid]);
 
-        if (empty($groupautoenrol->enable_enrol)) {
-            return true;
-        }
-
         // Winky wonky dirty hacky macky code... Should be replaced soon!
 
         $array = [19 => 70,
@@ -68,15 +64,17 @@ class tool_ltigroupautoenrol_observer {
                 SELECT $groupid groupid, userid userid, UNIX_TIMESTAMP(NOW()) timeadded
                 FROM {enrol_lti_users} ltiuser
                 WHERE toolid = $toolid
-                AND userid NOT IN (SELECT userid FROM {groups_members} WHERE groupid = $groupid)
-                ON DUPLICATE KEY UPDATE
-                timeadded = VALUES(timeadded);";
+                AND userid NOT IN (SELECT userid FROM {groups_members} WHERE groupid = $groupid);";
 
             $sqlresult = $DB->execute($sql);
         }
 
         return true;
         // Rest ist Legacy-Code, der nicht mehr ausgeführt wird.
+
+        if (empty($groupautoenrol->enable_enrol)) {
+            return true;
+        }
 
         $groupstouse = self::get_course_groups($groupautoenrol, $event);
 
