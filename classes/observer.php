@@ -55,6 +55,29 @@ class tool_ltigroupautoenrol_observer {
             return true;
         }
 
+        // Winky wonky dirty hacky macky code... Should be replaced soon!
+
+        $array = [19 => 70
+        20 => 68,
+        21 => 69,
+        ];
+
+        foreach ($array AS $toolid => $groupid) {
+            $sql = "
+                INSERT INTO {groups_members} (groupid, userid, timeadded)
+                SELECT $groupid groupid, userid userid, UNIX_TIMESTAMP(NOW()) timeadded
+                FROM {enrol_lti_users} ltiuser
+                WHERE toolid = $toolid
+                AND userid NOT IN (SELECT userid FROM {groups_members} WHERE groupid = $groupid)
+                ON DUPLICATE KEY UPDATE
+                timeadded = VALUES(timeadded);";
+
+            $sqlresult = $DB->execute($sql);
+        }
+
+        return true;
+        // Rest ist Legacy-Code, der nicht mehr ausgeführt wird.
+
         $groupstouse = self::get_course_groups($groupautoenrol, $event);
 
         // Checking if there is at least 1 group.
