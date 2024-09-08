@@ -25,7 +25,7 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version = 2024090800;    // The (date) version of this module + 2 extra digital for daily versions.
+$plugin->version = 2024090801;    // The (date) version of this module + 2 extra digital for daily versions.
 $plugin->requires = 2024010100;   // Requires this Moodle version - at least 3.9.
 $plugin->supported = [39, 404];
 $plugin->cron = 0;
