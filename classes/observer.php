@@ -18,13 +18,16 @@
  * Event observers used in tool_ltigroupautoenrol.
  *
  * @package    tool_ltigroupautoenrol
- * @copyright  2016 Pascal
- * @author     Pascal M - https://github.com/pascal-my
+ * @copyright  2024 ralferlebach, based upon tool_groupautoenrol
+ * @author     Ralf Erlebach, https://github.com/ralferlebach
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 use core\event\user_enrolment_created;
 
+/**
+ * Event observer for tool_ltigroupautoenrol.
+ */
 class tool_ltigroupautoenrol_observer {
 
     /**
