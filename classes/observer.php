@@ -43,8 +43,14 @@ class tool_ltigroupautoenrol_observer {
     public static function user_is_enrolled(user_enrolment_created $event): bool {
         global $CFG, $DB;
         require_once($CFG->dirroot . '/group/lib.php');
+
         $enroldata = $event->get_record_snapshot($event->objecttable, $event->objectid);
+
         $groupautoenrol = $DB->get_record('tool_ltigroupautoenrol', ['courseid' => $event->courseid]);
+
+        if (empty($groupautoenrol->enable_enrol)) {
+            return true;
+        }
 
         // Winky wonky dirty hacky macky code... Should be replaced soon!
 
@@ -61,7 +67,7 @@ class tool_ltigroupautoenrol_observer {
                 WHERE toolid = $toolid
                 AND userid NOT IN (SELECT userid FROM {groups_members} WHERE groupid = $groupid)";
 
-            $sqlresult = $DB->execute($sql);
+            $DB->execute($sql);
         }
 
         return true;
