@@ -67,10 +67,6 @@ class tool_ltigroupautoenrol_observer {
         return true;
         // Rest ist Legacy-Code, der nicht mehr ausgeführt wird.
 
-        if (empty($groupautoenrol->enable_enrol)) {
-            return true;
-        }
-
         $groupstouse = self::get_course_groups($groupautoenrol, $event);
 
         // Checking if there is at least 1 group.
