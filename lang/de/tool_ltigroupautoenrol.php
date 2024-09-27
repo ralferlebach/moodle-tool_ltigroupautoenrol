@@ -15,35 +15,21 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * GDPR Provider
- *
- * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * EN language file for tool_ltigroupautoenrol
  *
  * @package    tool_ltigroupautoenrol
  * @copyright  2024 Ralf Erlebach
  * @author     Ralf Erlebach - https://github.com/ralferlebach
- **/
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
 
-namespace local_commander\privacy;
+defined('MOODLE_INTERNAL') || die;
 
-/**
- * Class provider
- *
- * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @package   tool_ltigroupautoenrol
- * @copyright 23/07/2020 Mfreak.nl | LdesignMedia.nl - Luuk Verhoeven
- * @author    Luuk Verhoeven
- **/
-class provider implements \core_privacy\local\metadata\null_provider {
-
-    /**
-     * Get the language string identifier with the component's language file to explain why this plugin stores no data.
-     *
-     * @return  string
-     */
-    public static function get_reason(): string {
-        return 'privacy:null_reason';
-    }
-
-}
+$string['auto_group_enrol_form_no_group_found'] = 'Bitte legen Sie zunächst Gruppen an!';
+$string['auto_group_form_enable_enrol'] = 'Automatische Gruppenzuordnung via LTI für diesen Kurs aktivieren';
+$string['auto_group_form_groupslist'] = 'Gruppe wählen für: ';
+$string['auto_group_form_page_title'] = 'Gruppeneinschreibungen via LTI bearbeiten';
+$string['coursemenu_item'] = 'Gruppeneinschreibungen via LTI';
+$string['menu_auto_groups'] = 'Gruppeneinschreibungen via LTI';
+$string['pluginname'] = 'Automatische Gruppeneinschreibungen via LTI-Zugriff';
+$string['privacy:null_reason'] = 'Keine weiteren Nutzerdaten werden durch das Plugin gesammelt.';

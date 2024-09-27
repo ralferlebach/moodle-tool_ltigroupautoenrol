@@ -18,17 +18,20 @@
  * Version info
  *
  * @package    tool_ltigroupautoenrol
- * @copyright  2016 Pascal
- * @author     Pascal M - https://github.com/pascal-my
+ * @copyright  2024 Ralf Erlebach
+ * @author     Ralf Erlebach - https://github.com/ralferlebach
+ * based upon tool_ltigroupautoenrol by Pascal M
+ * tool_autoenrolingroups https://moodle.org/plugins/tool_groupautoenrol
+ * https://github.com/pascal-my/moodle-admin_tool_groupautoenrol
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version = 2024090802;    // The (date) version of this module + 2 extra digital for daily versions.
+$plugin->version = 2024092701;    // The (date) version of this module + 2 extra digital for daily versions.
 $plugin->requires = 2024010100;   // Requires this Moodle version - at least 3.9.
 $plugin->supported = [39, 404];
 $plugin->cron = 0;
 $plugin->component = 'tool_ltigroupautoenrol';
-$plugin->release = '0.1';
+$plugin->release = '0.2';
 $plugin->maturity = MATURITY_STABLE;

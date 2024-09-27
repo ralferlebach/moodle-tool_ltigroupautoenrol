@@ -44,140 +44,55 @@ class tool_ltigroupautoenrol_observer {
         global $CFG, $DB;
         require_once($CFG->dirroot . '/group/lib.php');
 
+        // Test, if the course has ltigroupautoenrol enabled.
+        $ltigroupautoenrol = $DB->get_record('tool_ltigroupautoenrol', ['courseid' => $event->courseid]);
+
+        if (empty($ltigroupautoenrol->enable_enrol)) {
+            return true;
+        }
+
         $enroldata = $event->get_record_snapshot($event->objecttable, $event->objectid);
 
-        $groupautoenrol = $DB->get_record('tool_ltigroupautoenrol', ['courseid' => $event->courseid]);
+        // Test, if enrolment was done by LTI.
+        $ltiinformation = \enrol_lti\helper::get_lti_tools(['courseid' => $event->courseid,
+        'enrolid' => $enroldata->enrolid,
+        'ltiversion' => 'LTI-1p3']);
 
-        if (empty($groupautoenrol->enable_enrol)) {
+        if (empty($ltiinformation)) {
             return true;
-        }
-
-        // Winky wonky dirty hacky macky code... Should be replaced soon!
-
-        $array = [19 => 70,
-        20 => 68,
-        21 => 69,
-        ];
-
-        foreach ($array as $toolid => $groupid) {
-            $sql = "
-                INSERT INTO {groups_members} (groupid, userid, timeadded)
-                SELECT $groupid groupid, userid userid, UNIX_TIMESTAMP(NOW()) timeadded
-                FROM {enrol_lti_users} ltiuser
-                WHERE toolid = $toolid
-                AND userid NOT IN (SELECT userid FROM {groups_members} WHERE groupid = $groupid)";
-
-            $DB->execute($sql);
-        }
-
-        return true;
-        // Rest ist Legacy-Code, der nicht mehr ausgeführt wird.
-
-        $groupstouse = self::get_course_groups($groupautoenrol, $event);
-
-        // Checking if there is at least 1 group.
-        if (empty($groupstouse)) {
-            return true;
-        }
-
-        // Checking if user is not already into these groups.
-        if (self::user_is_group_member($groupstouse, $enroldata)) {
-            return true;
-        }
-
-        self::add_user_to_group($groupautoenrol, $groupstouse, $enroldata);
-
-        return true;
-
-    }
-
-    /**
-     * Get the groups to use for the course.
-     *
-     * @param stdClass $groupautoenrol
-     * @param user_enrolment_created $event
-     *
-     * @return array
-     */
-    private static function get_course_groups(stdClass $groupautoenrol, user_enrolment_created $event): array {
-        $groupstouse = [];
-        if (!empty($groupautoenrol->use_groupslist)) {
-
-            // If use_groupslist == 1, we need to check.
-            // A) if the list is not empty.
-            if (!empty($groupautoenrol->groupslist)) {
-                $groupstemp = explode(",", $groupautoenrol->groupslist);
-
-                // B) if the listed groups still exists
-                // (because when a group is deleted, groupautoenrol table is not updated !).
-                $allgroupscourse = groups_get_all_groups($event->courseid);
-
-                foreach ($groupstemp as $group) {
-
-                    if (empty($allgroupscourse[$group])) {
-                        continue;
-                    }
-
-                    $groupstouse[] = $allgroupscourse[$group];
-                }
-            }
-
         } else {
-            // If use_groupslist == 0, use all groups course.
-            $groupstouse = groups_get_all_groups($event->courseid);
+            $ltiinformation = $ltiinformation[array_key_first($ltiinformation)];
         }
 
-        return $groupstouse;
+        self::check_and_enrol($ltigroupautoenrol, $ltiinformation, $enroldata);
+
+        return true;
     }
 
     /**
-     * Add user to group.
+     * Check groups and add enrol user.
      *
-     * @param stdClass $groupautoenrol
-     * @param array $groupstouse
-     * @param stdClass $enroldata
+     * @param stdClass $ltigroupautoenrol
+     * @param stdClass $ltiinformation
      *
      * @throws coding_exception
      */
-    private static function add_user_to_group(stdClass $groupautoenrol, array $groupstouse, stdClass $enroldata): void {
+    private static function check_and_enrol(stdClass $ltigroupautoenrol, stdClass $ltiinformation, stdClass $enroldata): void {
         global $USER;
 
-        if (!empty($groupautoenrol->enrol_method)) {
-            // 0 = random, 1 = alpha, 2 = balanced.
-            foreach ($groupstouse as $group) {
-                $groupname = $group->name;
+        $allgroupscourse = groups_get_all_groups($ltiinformation->courseid);
 
-                if (($groupname[strlen($groupname) - 2] <= $USER->lastname[0])
-                    && ($groupname[strlen($groupname) - 1] >= $USER->lastname[0])) {
-                    groups_add_member($group->id, $enroldata->userid);
-                    break; // Exit foreach (is it working ?).
-                }
-            }
-        } else {
-            // Array_rand return key not value!
-            $randkeys = array_rand($groupstouse);
-            $group2add = $groupstouse[$randkeys];
-            groups_add_member($group2add, $enroldata->userid);
-        }
-    }
+        $groupstoenroll = json_decode($ltigroupautoenrol->settings, true);
 
-    /**
-     * Check if user is already in one of the groups.
-     *
-     * @param array $groupstouse
-     * @param stdClass $enroldata
-     *
-     * @return bool
-     */
-    private static function user_is_group_member(array $groupstouse, stdClass $enroldata): bool {
-
-        foreach ($groupstouse as $group) {
-            if (groups_is_member($group->id, $enroldata->userid)) {
-                return true;
-            }
+        if (empty($groupstoenroll)) {
+            return;
         }
 
-        return false;
+        foreach ($groupstoenroll[$ltiinformation->id] as $group) {
+            if (array_key_exists($group, $allgroupscourse)) {
+                groups_add_member($group, $enroldata->userid);
+                error_log("Enrol user ".$enroldata->userid." to group ".$group,0);
+            }
+        }
     }
-
 }

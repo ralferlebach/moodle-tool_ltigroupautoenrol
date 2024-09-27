@@ -20,9 +20,8 @@
  * Params page for auto group enrollment as defined by Comete
  *
  * @package    tool_ltigroupautoenrol
- * @copyright  2024 ralferlebach
- * upon tool_ltigroupautoenrol by Pascal
- * @author     Pascal M - https://github.com/pascal-my
+ * @copyright  2024 Ralf Erlebach
+ * @author     Ralf Erlebach - https://github.com/ralferlebach
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
@@ -35,7 +34,6 @@ $courseid = required_param('id', PARAM_INT);
 $url = new moodle_url('/admin/tool/ltigroupautoenrol/manage_lti_group_auto_enrol.php', ['id' => $courseid]);
 $PAGE->set_url($url);
 
-// TODO we need to gracefully shutdown if course not found.
 $course = $DB->get_record('course', ['id' => $courseid], '*', MUST_EXIST);
 
 require_login($course);
@@ -52,50 +50,44 @@ $form = new \tool_ltigroupautoenrol\form\manage_lti_group_auto_enrol_form($url, 
 ]);
 
 if ($form->is_cancelled()) {
+    // Form is cancelled, return to course.
     redirect(new moodle_url('/course/view.php', ['id' => $course->id]));
 } else if ($data = $form->get_data()) {
+    // Form submitted, now get the data.
 
     if (empty($data->enable_enrol)) {
         $data->enable_enrol = 0;
     }
 
-    if (empty($data->use_groupslist)) {
-        $data->use_groupslist = 0;
-    }
+    $ltigroupautoenrol = new stdClass();
+    $ltigroupautoenrol->courseid = $course->id;
+    $ltigroupautoenrol->enable_enrol = $data->enable_enrol;
 
-    $groupautoenrol = new stdClass();
-    $groupautoenrol->courseid = $course->id;
-    $groupautoenrol->enable_enrol = $data->enable_enrol;
-    $groupautoenrol->use_groupslist = $data->use_groupslist;
+    if (isset($data->ltitoolcount)) {
 
-    if (isset($data->groupslist)) { // Could be not set.
-        $groupautoenrol->groupslist = implode(",", $data->groupslist);
+        $ltitoolcourses = [];
+        for ($i = 0; $i < $data->ltitoolcount; $i++) {
+            if (isset($data->{"ltitoolid_".$i}) && isset($data->{"groupslist_".$i})) {
+                $ltitoolcourses[$data->{"ltitoolid_".$i}] = $data->{"groupslist_".$i};
+            }
+        }
+        $ltigroupautoenrol->settings = json_encode($ltitoolcourses);
     }
 
     $record = $DB->get_record('tool_ltigroupautoenrol', ['courseid' => $course->id], 'id');
     if (!$record) {
-        $DB->insert_record('tool_ltigroupautoenrol', $groupautoenrol);
+        $DB->insert_record('tool_ltigroupautoenrol', $ltigroupautoenrol);
     } else {
-        $groupautoenrol->id = $record->id;
-        $DB->update_record('tool_ltigroupautoenrol', $groupautoenrol);
+        $ltigroupautoenrol->id = $record->id;
+        $DB->update_record('tool_ltigroupautoenrol', $ltigroupautoenrol);
     }
 
-    redirect(
-        new moodle_url('/admin/tool/ltigroupautoenrol/manage_lti_group_auto_enrol.php',
-            ['id' => $course->id]
-        )
-    );
+    redirect(new moodle_url('/admin/tool/ltigroupautoenrol/manage_lti_group_auto_enrol.php', ['id' => $course->id]));
 }
 
 echo $OUTPUT->header();
 
-
 echo $OUTPUT->heading(get_string('auto_group_form_page_title', 'tool_ltigroupautoenrol'));
-
-echo "<br><br>Anzahl der Deployments für diesen Kurs: ".(\enrol_lti\helper::count_lti_tools(['courseid' => $courseid,
-    'ltiversion' => 'LTI-1p3'],
-    ))."<br>";
-
 
 echo $form->render();
 echo $OUTPUT->footer();

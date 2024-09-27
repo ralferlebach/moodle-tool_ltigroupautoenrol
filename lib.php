@@ -18,8 +18,8 @@
  * Lib functions
  *
  * @package    tool_ltigroupautoenrol
- * @copyright  2016 Pascal
- * @author     Pascal M - https://github.com/pascal-my
+ * @copyright  2024 Ralf Erlebach
+ * @author     Ralf Erlebach - https://github.com/ralferlebach
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
