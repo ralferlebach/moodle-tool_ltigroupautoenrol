@@ -67,8 +67,6 @@ class manage_lti_group_auto_enrol_form extends moodleform {
         $course = $this->_customdata['course'];
         $allgroupscourse = groups_get_all_groups($course->id);
 
-        $allltideployments = groups_get_all_groups($course->id);
-
         $mform->addElement('header', 'enrol', get_string('settings'));
 
         // Group(s) must be created first.
@@ -100,12 +98,12 @@ class manage_lti_group_auto_enrol_form extends moodleform {
         $ltitoolcount = \enrol_lti\helper::count_lti_tools([
             'courseid' => $course->id,
             'ltiversion' => 'LTI-1p3',
-            ],);
+            ]);
 
         $ltitools = \enrol_lti\helper::get_lti_tools([
             'courseid' => $course->id,
             'ltiversion' => 'LTI-1p3',
-            ],);
+            ]);
 
         $ltitoolgroup = json_decode($instance->settings, true);
 
@@ -118,12 +116,12 @@ class manage_lti_group_auto_enrol_form extends moodleform {
             $select = $mform->addElement(
                 'select',
                 'groupslist_'.$i,
-                .get_string('auto_group_form_groupslist', 'tool_ltigroupautoenrol'). $ltitool->name,
+                get_string('auto_group_form_groupslist', 'tool_ltigroupautoenrol'). $ltitool->name,
                 $fields
             );
             $select->setMultiple(true);
             $mform->disabledIf('groupslist_'.$i, 'enable_enrol');
-            $mform->setDefault('groupslist_'.$i, $ltitoolgroup[$ltitool->id] ?? []);
+            $mform->setDefault('groupslist_'.$i, $ltitoolgroup[$toolid] ?? []);
 
             $i++;
         }

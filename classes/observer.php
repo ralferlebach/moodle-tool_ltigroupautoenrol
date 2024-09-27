@@ -74,11 +74,11 @@ class tool_ltigroupautoenrol_observer {
      *
      * @param stdClass $ltigroupautoenrol
      * @param stdClass $ltiinformation
+     * @param stdClass $enroldata
      *
      * @throws coding_exception
      */
     private static function check_and_enrol(stdClass $ltigroupautoenrol, stdClass $ltiinformation, stdClass $enroldata): void {
-        global $USER;
 
         $allgroupscourse = groups_get_all_groups($ltiinformation->courseid);
 
@@ -91,7 +91,6 @@ class tool_ltigroupautoenrol_observer {
         foreach ($groupstoenroll[$ltiinformation->id] as $group) {
             if (array_key_exists($group, $allgroupscourse)) {
                 groups_add_member($group, $enroldata->userid);
-                error_log("Enrol user ".$enroldata->userid." to group ".$group,0);
             }
         }
     }
