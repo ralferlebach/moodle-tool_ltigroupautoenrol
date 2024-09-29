@@ -30,6 +30,7 @@ Note : this link appears even if the plugin is not enabled for the course
 * @author     Ralf Erlebach -https://github.com/ralferlebach
 * @author     Pascal M - https://github.com/pascal-my
 * @author     Luuk Verhoeven - https://github.com/luukverhoeven
+
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
