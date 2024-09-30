@@ -13,10 +13,11 @@ This plugin is derived from tool_autoenrolingroups plugin.
 ## In this stable version (1.0) :
 - GDPR implementation
 - you can choose to enable the plugin in each course
-- you can choose to auto-enrol students in one or more groups each LTI tool deployment
+- you can choose to auto-enrol students in one or more groups each LTI tool deployment#
+- only works with LTI 1.3 Advance
 
 ## Compatibility :
-- Tested with Moodle 4.4
+- Tested with Moodle 4.4 and LTI 1.3 Advance
 
 # Installation
 * Copy the directory 'ltigroupautoenrol' into the `moodledir/admin/tool` directory.
