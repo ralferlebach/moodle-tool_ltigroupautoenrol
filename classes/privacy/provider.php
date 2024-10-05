@@ -24,7 +24,7 @@
  * @author     Ralf Erlebach - https://github.com/ralferlebach
  **/
 
-namespace local_commander\privacy;
+namespace local_ltigroupautoenrol\privacy;
 
 /**
  * Class provider
