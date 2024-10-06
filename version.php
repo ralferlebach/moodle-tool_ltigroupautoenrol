@@ -28,10 +28,10 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version = 2024093000;    // The (date) version of this module + 2 extra digital for daily versions.
+$plugin->version = 2024100600;    // The (date) version of this module + 2 extra digital for daily versions.
 $plugin->requires = 2022112800;   // Requires this Moodle version - at least 4.1.0.
 $plugin->supportedmoodles = [401, 402, 403, 404];
 $plugin->cron = 0;
 $plugin->component = 'tool_ltigroupautoenrol';
-$plugin->release = '1.0';
+$plugin->release = '1.0.1';
 $plugin->maturity = MATURITY_STABLE;
