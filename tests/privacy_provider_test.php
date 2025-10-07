@@ -23,9 +23,7 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-defined('MOODLE_INTERNAL') || die();
-
-use core_privacy\tests\provider_testcase;
+use core_privacy\tests\provider_test;
 
 /**
  * Privacy provider tests for tool_ltigroupautoenrol.
@@ -40,7 +38,7 @@ use core_privacy\tests\provider_testcase;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  * @covers     \tool_ltigroupautoenrol\privacy\provider
  */
-class tool_ltigroupautoenrol_privacy_provider_testcase extends provider_testcase {
+class tool_ltigroupautoenrol_privacy_provider_test extends provider_test {
 
     /**
      * Test that the privacy provider is either a null provider or does not implement userlist provider.
@@ -68,11 +66,11 @@ class tool_ltigroupautoenrol_privacy_provider_testcase extends provider_testcase
         $hasuserlistprovider = isset($interfaces[\core_privacy\local\request\userlist_provider::class]);
 
         // Assert that the provider does not expose user list data.
-        $this->assertFalse($hasuserlistprovider, 
+        $this->assertFalse($hasuserlistprovider,
             'Privacy provider should not implement userlist_provider interface');
-        
+
         // Assert that it's either a null provider OR doesn't have userlist capabilities.
-        $this->assertTrue($isnullprovider || !$hasuserlistprovider, 
+        $this->assertTrue($isnullprovider || !$hasuserlistprovider,
             'Privacy provider must be either a null_provider or not implement userlist_provider');
     }
 }

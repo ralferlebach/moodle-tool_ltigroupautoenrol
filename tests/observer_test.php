@@ -23,8 +23,6 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-defined('MOODLE_INTERNAL') || die();
-
 use core\event\user_enrolment_created;
 
 /**
@@ -40,11 +38,11 @@ use core\event\user_enrolment_created;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  * @covers     \tool_ltigroupautoenrol\observer
  */
-class tool_ltigroupautoenrol_observer_testcase extends advanced_testcase {
+class tool_ltigroupautoenrol_observer_test extends advanced_test {
 
     /**
      * Main configuration table name.
-     * 
+     *
      * @var string TABLE Name of the main plugin configuration table
      */
     private const TABLE = 'tool_ltigroupautoenrol';
@@ -124,9 +122,9 @@ class tool_ltigroupautoenrol_observer_testcase extends advanced_testcase {
         $event->trigger();
 
         // Assert user is added to both mapped groups.
-        $this->assertTrue(groups_is_member($group1, $user->id), 
+        $this->assertTrue(groups_is_member($group1, $user->id),
             'User should be added to first mapped group');
-        $this->assertTrue(groups_is_member($group2, $user->id), 
+        $this->assertTrue(groups_is_member($group2, $user->id),
             'User should be added to second mapped group');
     }
 
@@ -158,13 +156,13 @@ class tool_ltigroupautoenrol_observer_testcase extends advanced_testcase {
             'relateduserid'  => $user->id,
             'courseid'       => $course->id,
             'other'          => [
-                'enrol' => 'manual',  // Non-LTI enrolment method
+                'enrol' => 'manual',  // Non-LTI enrolment method.
             ],
         ]);
         $event->trigger();
 
         // Assert user is not added to group.
-        $this->assertFalse(groups_is_member($group, $user->id), 
+        $this->assertFalse(groups_is_member($group, $user->id),
             'User should not be added to groups for non-LTI enrolments');
     }
 
@@ -207,9 +205,9 @@ class tool_ltigroupautoenrol_observer_testcase extends advanced_testcase {
         $event->trigger();
 
         // Assert user is added to existing group but not the deleted one.
-        $this->assertTrue(groups_is_member($existinggroup, $user->id), 
+        $this->assertTrue(groups_is_member($existinggroup, $user->id),
             'User should be added to existing mapped groups');
-        $this->assertFalse(groups_is_member($tobedeleted, $user->id), 
+        $this->assertFalse(groups_is_member($tobedeleted, $user->id),
             'User should not be added to deleted groups');
     }
 }
