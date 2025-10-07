@@ -28,6 +28,7 @@
  */
 
 use core\event\user_enrolment_created;
+namespace tool_ltigroupautoenrol;
 
 /**
  * Test class for LTI group auto enrolment event observer.

@@ -15,7 +15,11 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Privacy provider tests for tool_ltigroupautoenrol.
+ * Unit tests for the privacy provider of tool_ltigroupautoenrol.
+ *
+ * This file contains tests to ensure that the privacy provider for the
+ * LTI Group Auto Enrol plugin correctly implements the required privacy
+ * interfaces and does not expose user data inappropriately.
  *
  * @package    tool_ltigroupautoenrol
  * @category   test
@@ -25,13 +29,15 @@
  */
 
 use core_privacy\privacy;
+namespace tool_ltigroupautoenrol;
 
 /**
- * Privacy provider tests for tool_ltigroupautoenrol.
+ * Unit tests for the privacy provider of tool_ltigroupautoenrol.
  *
  * This test class verifies that the privacy provider for the LTI Group Auto Enrol
- * tool correctly implements privacy interfaces and does not expose user data
- * inappropriately.
+ * tool either implements the null_provider interface (indicating no personal data is stored)
+ * or does not implement the userlist_provider interface (indicating it does not expose user lists).
+ * This is important for GDPR compliance and data protection.
  *
  * @package    tool_ltigroupautoenrol
  * @category   test
@@ -39,17 +45,14 @@ use core_privacy\privacy;
  * @author     Ralf Erlebach <ralf.erlebach@gmx.de>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-
 class privacy_provider_test extends provider_test {
 
     /**
-     * Test that the privacy provider is either a null provider or does not implement userlist provider.
+     * Tests that the privacy provider is either a null provider or does not implement userlist provider.
      *
-     * This test ensures that the privacy provider for tool_ltigroupautoenrol either:
+     * Ensures that the privacy provider for tool_ltigroupautoenrol either:
      * 1. Implements the null_provider interface (indicating no personal data is stored), OR
-     * 2. Does not implement the userlist_provider interface (indicating it doesn't expose user lists)
-     *
-     * This is important for GDPR compliance and data protection.
+     * 2. Does not implement the userlist_provider interface (indicating it doesn't expose user lists).
      *
      * @return void
      * @covers \tool_ltigroupautoenrol\privacy\provider
