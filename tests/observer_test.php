@@ -38,7 +38,7 @@ use core\event\user_enrolment_created;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  * @covers     \tool_ltigroupautoenrol\observer
  */
-class tool_ltigroupautoenrol_observer_test extends advanced_test {
+class observer_test extends advanced_test {
 
     /**
      * Main configuration table name.

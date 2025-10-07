@@ -23,7 +23,7 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-use core_privacy\tests\provider_test;
+use core_privacy\privacy;
 
 /**
  * Privacy provider tests for tool_ltigroupautoenrol.
@@ -38,7 +38,7 @@ use core_privacy\tests\provider_test;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  * @covers     \tool_ltigroupautoenrol\privacy\provider
  */
-class tool_ltigroupautoenrol_privacy_provider_test extends provider_test {
+class privacy_provider_test extends provider_test {
 
     /**
      * Test that the privacy provider is either a null provider or does not implement userlist provider.
