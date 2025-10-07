@@ -40,7 +40,7 @@ use core\event\user_enrolment_created;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-class observer_test extends advanced_test {
+class observer_test extends advanced_testcase {
 
     /**
      * Main configuration table name.
