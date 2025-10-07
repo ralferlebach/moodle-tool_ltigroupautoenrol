@@ -172,4 +172,62 @@ class tool_ltigroupautoenrol_observer_testcase extends advanced_testcase {
 
         // Trigger non-LTI enrolment event (manual enrolment).
         $event = user_enrolment_created::create([
-            'context'
+            'context'        => \context_course::instance($course->id),
+            'relateduserid'  => $user->id,
+            'courseid'       => $course->id,
+            'other'          => [
+                'enrol' => 'manual',  // Non-LTI enrolment method
+            ],
+        ]);
+        $event->trigger();
+
+        // Assert user is not added to group.
+        $this->assertFalse(groups_is_member($group, $user->id), 
+            'User should not be added to groups for non-LTI enrolments');
+    }
+
+    /**
+     * Test that deleted groups are handled gracefully.
+     *
+     * Verifies that when mapped groups are deleted, the plugin handles this
+     * gracefully without errors and only adds users to existing groups.
+     *
+     * @return void
+     * @covers \tool_ltigroupautoenrol\observer::user_enrolment_created
+     */
+    public function test_deleted_groups_are_ignored(): void {
+        // Set up test data.
+        $generator = $this->getDataGenerator();
+        $course = $generator->create_course();
+        $user = $generator->create_user();
+
+        // Create test groups.
+        $existinggroup = groups_create_group((object)['courseid' => $course->id, 'name' => 'Existing Group']);
+        $tobedeleted = groups_create_group((object)['courseid' => $course->id, 'name' => 'Group to Delete']);
+
+        // Set up deployment mapping with both groups.
+        $deploymentid = 'deployment-abc';
+        $this->create_course_mapping($course->id, $deploymentid, [$existinggroup, $tobedeleted], true);
+
+        // Delete one of the mapped groups.
+        groups_delete_group($tobedeleted);
+
+        // Trigger LTI enrolment event.
+        $event = user_enrolment_created::create([
+            'context'        => \context_course::instance($course->id),
+            'relateduserid'  => $user->id,
+            'courseid'       => $course->id,
+            'other'          => [
+                'enrol'            => 'lti',
+                'ltideploymentid'  => $deploymentid,
+            ],
+        ]);
+        $event->trigger();
+
+        // Assert user is added to existing group but not the deleted one.
+        $this->assertTrue(groups_is_member($existinggroup, $user->id), 
+            'User should be added to existing mapped groups');
+        $this->assertFalse(groups_is_member($tobedeleted, $user->id), 
+            'User should not be added to deleted groups');
+    }
+}
