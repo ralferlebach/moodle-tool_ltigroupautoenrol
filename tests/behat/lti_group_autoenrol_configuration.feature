@@ -18,7 +18,7 @@ Feature: Configure LTI group auto enrolment
   Scenario: Configure LTI group auto enrolment with groups
     Given I am on the "Course 1" course page logged in as "teacher1"
     When I navigate to "Participants" in current page administration
-    And I click on "Enrolled users" "link"
+    And I click on "Enrolled users" "button"
     Then I should see "LTI enrol in groups" in the "Enrolment methods" "select"
 
     When I select "LTI enrol in groups" from the "Enrolment methods" singleselect
@@ -41,7 +41,7 @@ Feature: Configure LTI group auto enrolment
     Then I should see "Group B" in the "Groups" "table"
 
     When I navigate to "Participants" in current page administration
-    And I click on "Enrolled users" "link"
+    And I click on "Enrolled users" "button"
     And I select "LTI enrol in groups" from the "Enrolment methods" singleselect
     Then I should see "Enable automatic enrolment in groups for this course"
 
@@ -50,7 +50,7 @@ Feature: Configure LTI group auto enrolment
     Then I should see "Changes saved"
 
     When I navigate to "Participants" in current page administration
-    And I click on "Enrolled users" "link"
+    And I click on "Enrolled users" "button"
     And I select "LTI enrol in groups" from the "Enrolment methods" singleselect
     Then the field "Enable automatic enrolment in groups for this course" matches value "1"
 
@@ -61,13 +61,13 @@ Feature: Configure LTI group auto enrolment
       | Group B | C1     | GB       |
     And I am on the "Course 1" course page logged in as "teacher1"
     When I navigate to "Participants" in current page administration
-    And I click on "Enrolled users" "link"
+    And I click on "Enrolled users" "button"
     And I select "LTI enrol in groups" from the "Enrolment methods" singleselect
     Then I should see "Enable automatic enrolment in groups for this course"
 
     When I set the field "Enable automatic enrolment in groups for this course" to "1"
     And I press "Save changes"
     And I navigate to "Participants" in current page administration
-    And I click on "Enrolled users" "link"
+    And I click on "Enrolled users" "button"
     And I select "LTI enrol in groups" from the "Enrolment methods" singleselect
     Then the field "Enable automatic enrolment in groups for this course" matches value "1"
