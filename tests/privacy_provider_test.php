@@ -28,7 +28,7 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-use core_privacy\privacy;
+use core_privacy\tests\provider_testcase;
 namespace tool_ltigroupautoenrol;
 
 /**
@@ -45,7 +45,7 @@ namespace tool_ltigroupautoenrol;
  * @author     Ralf Erlebach <ralf.erlebach@gmx.de>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class privacy_provider_test extends provider_test {
+class privacy_provider_test extends provider_testcase {
 
     /**
      * Tests that the privacy provider is either a null provider or does not implement userlist provider.
