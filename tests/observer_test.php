@@ -15,7 +15,10 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Event handling tests for LTI group auto enrolment.
+ * Unit tests for event handling in LTI group auto enrolment tool.
+ *
+ * Contains tests for the observer that handles user enrolment events and
+ * assigns users to groups based on LTI deployment mappings.
  *
  * @package    tool_ltigroupautoenrol
  * @category   test
@@ -27,11 +30,11 @@
 use core\event\user_enrolment_created;
 
 /**
- * Tests for event handling of automatic group assignment in LTI.
+ * Test class for LTI group auto enrolment event observer.
  *
- * This test class verifies that the LTI group auto enrolment tool correctly
- * handles user enrolment events and assigns users to appropriate groups
- * based on LTI deployment mappings.
+ * This class tests the observer responsible for automatically assigning users
+ * to groups upon LTI enrolment, according to deployment mappings configured
+ * in the plugin.
  *
  * @package    tool_ltigroupautoenrol
  * @category   test
@@ -40,17 +43,18 @@ use core\event\user_enrolment_created;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class observer_test extends advanced_testcase {
+
     /**
-     * Main configuration table name.
+     * Name of the main plugin configuration table.
      *
-     * @var string TABLE Name of the main plugin configuration table
+     * @var string
      */
     private const TABLE = 'tool_ltigroupautoenrol';
 
     /**
-     * Set up test environment.
+     * Sets up the test environment before each test.
      *
-     * Prepares the test environment by calling parent setup and resetting after test.
+     * Calls parent setUp and resets the database after each test.
      *
      * @return void
      */
@@ -62,13 +66,13 @@ class observer_test extends advanced_testcase {
     /**
      * Creates course configuration and group mappings for testing.
      *
-     * This method sets up the necessary database records to configure
-     * LTI group auto enrolment for a specific course and deployment.
+     * Inserts a configuration record for the specified course and deployment,
+     * mapping the given group IDs to the deployment.
      *
-     * @param int $courseid The course ID to configure
-     * @param string $deploymentid The LTI deployment ID
-     * @param int[] $groupids Array of group IDs to map to this deployment
-     * @param bool $enabled Whether the configuration should be enabled (default: true)
+     * @param int $courseid The course ID to configure.
+     * @param string $deploymentid The LTI deployment ID.
+     * @param int[] $groupids Array of group IDs to map to this deployment.
+     * @param bool $enabled Whether the configuration should be enabled (default: true).
      * @return void
      */
     private function create_course_mapping(int $courseid, string $deploymentid, array $groupids, bool $enabled = true): void {
@@ -81,11 +85,10 @@ class observer_test extends advanced_testcase {
             'settings'     => json_encode([$deploymentid => $groupids]),
         ];
         $configrecord->id = $DB->insert_record(self::TABLE, $configrecord);
-
     }
 
     /**
-     * Test that LTI enrolment adds users to mapped groups.
+     * Tests that LTI enrolment adds users to mapped groups.
      *
      * Verifies that when a user is enrolled via LTI with a specific deployment ID,
      * they are automatically added to all groups mapped to that deployment.
@@ -129,7 +132,7 @@ class observer_test extends advanced_testcase {
     }
 
     /**
-     * Test that non-LTI enrolments are ignored.
+     * Tests that non-LTI enrolments are ignored.
      *
      * Verifies that enrolment events from other enrolment methods (e.g., manual)
      * do not trigger automatic group assignment.
@@ -167,7 +170,7 @@ class observer_test extends advanced_testcase {
     }
 
     /**
-     * Test that deleted groups are handled gracefully.
+     * Tests that deleted groups are handled gracefully.
      *
      * Verifies that when mapped groups are deleted, the plugin handles this
      * gracefully without errors and only adds users to existing groups.
