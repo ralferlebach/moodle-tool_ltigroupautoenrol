@@ -50,13 +50,6 @@ class tool_ltigroupautoenrol_observer_testcase extends advanced_testcase {
     private const TABLE = 'tool_ltigroupautoenrol';
 
     /**
-     * Mapping table name for deployment to group relationships.
-     * 
-     * @var string MAPTABLE Name of the deployment-to-group mapping table
-     */
-    private const MAPTABLE = 'tool_ltigroupautoenrol_map';
-
-    /**
      * Set up test environment.
      *
      * Prepares the test environment by calling parent setup and resetting after test.
@@ -86,22 +79,11 @@ class tool_ltigroupautoenrol_observer_testcase extends advanced_testcase {
         // Create base configuration record.
         $configrecord = (object)[
             'courseid'     => $courseid,
-            'enabled'      => $enabled ? 1 : 0,
-            'timecreated'  => time(),
-            'timemodified' => time(),
+            'enable_enrol' => $enabled ? 1 : 0,
+            'settings'     => json_encode([$deploymentid => $groupids]),
         ];
         $configrecord->id = $DB->insert_record(self::TABLE, $configrecord);
 
-        // Create mapping records for each group.
-        foreach ($groupids as $groupid) {
-            $mappingrecord = (object)[
-                'configid'      => $configrecord->id,
-                'deploymentid'  => $deploymentid,
-                'groupid'       => $groupid,
-                'timecreated'   => time(),
-            ];
-            $DB->insert_record(self::MAPTABLE, $mappingrecord);
-        }
     }
 
     /**
