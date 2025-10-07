@@ -32,8 +32,14 @@ use core\event\user_enrolment_created;
  * This test class verifies that the LTI group auto enrolment tool correctly
  * handles user enrolment events and assigns users to appropriate groups
  * based on LTI deployment mappings.
+ *
+ * @package    tool_ltigroupautoenrol
+ * @category   test
+ * @copyright  2025 Ralf Erlebach
+ * @author     Ralf Erlebach <ralf.erlebach@gmx.de>
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
- 
+
 class observer_test extends advanced_test {
 
     /**

@@ -32,8 +32,14 @@ use core_privacy\privacy;
  * This test class verifies that the privacy provider for the LTI Group Auto Enrol
  * tool correctly implements privacy interfaces and does not expose user data
  * inappropriately.
+ *
+ * @package    tool_ltigroupautoenrol
+ * @category   test
+ * @copyright  2025 Ralf Erlebach
+ * @author     Ralf Erlebach <ralf.erlebach@gmx.de>
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
- 
+
 class privacy_provider_test extends provider_test {
 
     /**
