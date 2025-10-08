@@ -84,7 +84,7 @@ class manage_lti_group_auto_enrol_form extends moodleform {
 
         $instance = $DB->get_record('tool_ltigroupautoenrol', ['courseid' => $course->id]);
         if (!$instance) {
-            $instance = new stdClass();
+            $instance = new \stdClass();
             $instance->courseid = $course->id;
             $instance->enable_enrol = 0;
             $instance->settings = json_encode([]);
