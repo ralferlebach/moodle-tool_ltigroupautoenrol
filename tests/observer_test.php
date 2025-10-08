@@ -27,8 +27,8 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-use core\event\user_enrolment_created;
 namespace tool_ltigroupautoenrol;
+use core\event\user_enrolment_created;
 
 /**
  * Test class for LTI group auto enrolment event observer.

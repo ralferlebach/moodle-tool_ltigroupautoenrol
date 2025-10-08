@@ -28,8 +28,8 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-use core_privacy\tests\provider_testcase;
 namespace tool_ltigroupautoenrol;
+use core_privacy\tests\provider_testcase;
 
 /**
  * Unit tests for the privacy provider of tool_ltigroupautoenrol.
