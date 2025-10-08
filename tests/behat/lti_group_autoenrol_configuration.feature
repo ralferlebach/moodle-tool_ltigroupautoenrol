@@ -18,13 +18,37 @@ Feature: Configure LTI group auto enrolment
   Scenario: Check whether LTI-enrol is accessible
     Given I am on the "Course 1" course page logged in as "teacher1"
     When I navigate to "Participants" in current page administration
-    And I click on "Enrolled users" "combobox"
+    And I click on ".dropdown-toggle:contains('Enrolled users')" "css_element"
     Then I should see "LTI-enrol in groups"
 
-  Scenario: Configure LTI group auto enrolment without groups
+  Scenario: Try to configure LTI group auto enrolment without groups
     Given I am on the "Course 1" course page logged in as "teacher1"
     When I navigate to "Participants" in current page administration
-    And I click on "Enrolled users" "combobox"
+    And I click on ".dropdown-toggle:contains('Enrolled users')" "css_element"
     And I click on "LTI-enrol in groups" "option"
     Then I should see "Create groups first!"
     And I should not see "Enable automatic enrolment in groups for this course"
+    
+  Scenario: Configure LTI group auto enrolment without groups
+    Given I am on the "Course 1" course page logged in as "teacher1"
+    When I navigate to "Participants" in current page administration
+    And I click on ".dropdown-toggle:contains('Enrolled users')" "css_element"
+    And I click on "LTI-enrol in groups" "option"
+    And I click on "Create groups first!" "link"
+    Then I should see "Create group"
+
+  Scenario: Configure LTI group auto enrolment with existing groups
+    Given the following "groups" exist:
+      | name    | course | idnumber |
+      | Group A | C1     | GA       |
+      | Group B | C1     | GB       |
+    And I am on the "Course 1" course page logged in as "teacher1"
+    When I navigate to "Participants" in current page administration
+    And I click on ".dropdown-toggle:contains('Enrolled users')" "css_element"
+    And I click on "LTI-enrol in groups" "option"
+    And I set the field "Enable automatic enrolment in groups for this course" to "1"
+    And I press "Save changes"
+    And I navigate to "Participants" in current page administration
+    And I click on ".dropdown-toggle:contains('Enrolled users')" "css_element"
+    And I click on "LTI-enrol in groups" "option"
+    Then the field "Enable automatic enrolment in groups for this course" matches value "1"
