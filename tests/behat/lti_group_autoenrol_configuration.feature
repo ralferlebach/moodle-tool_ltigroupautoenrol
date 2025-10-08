@@ -25,7 +25,7 @@ Feature: Configure LTI group auto enrolment
     Given I am on the "Course 1" course page logged in as "teacher1"
     When I navigate to "Participants" in current page administration
     And I click on ".dropdown-toggle:contains('Enrolled users')" "css_element"
-    And I click on ".dropdown-item" "css_element" containing "LTI-enrol in groups"
+    And I click on ".dropdown-item:contains('LTI-enrol in groups')" "css_element"
     Then I should see "Create groups first!"
     And I should not see "Enable automatic enrolment in groups for this course"
 
@@ -33,7 +33,7 @@ Feature: Configure LTI group auto enrolment
     Given I am on the "Course 1" course page logged in as "teacher1"
     When I navigate to "Participants" in current page administration
     And I click on ".dropdown-toggle:contains('Enrolled users')" "css_element"
-    And I click on ".dropdown-item" "css_element" containing "LTI-enrol in groups"
+    And I click on ".dropdown-item:contains('LTI-enrol in groups')" "css_element"
     And I click on "Create groups first!" "link"
     Then I should see "Create group"
 
@@ -45,7 +45,7 @@ Feature: Configure LTI group auto enrolment
     And I am on the "Course 1" course page logged in as "teacher1"
     When I navigate to "Participants" in current page administration
     And I click on ".dropdown-toggle:contains('Enrolled users')" "css_element"
-    And I click on ".dropdown-item" "css_element" containing "LTI-enrol in groups"
+    And I click on ".dropdown-item:contains('LTI-enrol in groups')" "css_element"
     And I set the field "Enable automatic enrolment in groups for this course" to "1"
     And I press "Save changes"
     And I navigate to "Participants" in current page administration
