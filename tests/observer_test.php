@@ -43,7 +43,7 @@ use core\event\user_enrolment_created;
  * @author     Ralf Erlebach <ralf.erlebach@gmx.de>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class observer_test extends advanced_testcase {
+final class observer_test extends advanced_testcase {
 
     /**
      * Name of the main plugin configuration table.
