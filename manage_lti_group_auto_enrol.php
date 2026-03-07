@@ -20,7 +20,7 @@
  * Params page for auto group enrollment as defined by Comete
  *
  * @package    tool_ltigroupautoenrol
- * @copyright  2024 Ralf Erlebach
+ * @copyright  2026 Ralf Erlebach
  * @author     Ralf Erlebach - https://github.com/ralferlebach
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -64,11 +64,10 @@ if ($form->is_cancelled()) {
     $ltigroupautoenrol->enable_enrol = $data->enable_enrol;
 
     if (isset($data->ltitoolcount)) {
-
         $ltitoolcourses = [];
         for ($i = 0; $i < $data->ltitoolcount; $i++) {
-            if (isset($data->{"ltitoolid_".$i}) && isset($data->{"groupslist_".$i})) {
-                $ltitoolcourses[$data->{"ltitoolid_".$i}] = $data->{"groupslist_".$i};
+            if (isset($data->{"ltitoolid_" . $i}) && isset($data->{"groupslist_" . $i})) {
+                $ltitoolcourses[$data->{"ltitoolid_" . $i}] = $data->{"groupslist_" . $i};
             }
         }
         $ltigroupautoenrol->settings = json_encode($ltitoolcourses);

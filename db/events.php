@@ -18,7 +18,7 @@
  * Observers declaration
  *
  * @package    tool_ltigroupautoenrol
- * @copyright  2024 Ralf Erlebach
+ * @copyright  2026 Ralf Erlebach
  * @author     Ralf Erlebach - https://github.com/ralferlebach
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */

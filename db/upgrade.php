@@ -17,12 +17,11 @@
 /**
  * Upgrade steps.
  *
- * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @package   tool_ltigroupautoenrol
- * @copyright 04/04/2024 Mfreak.nl | LdesignMedia.nl - Luuk Verhoeven
- * @author    Luuk Verhoeven
- **/
+ * @package    tool_ltigroupautoenrol
+ * @copyright  2026 Ralf Erlebach
+ * @author     Ralf Erlebach - https://github.com/ralferlebach
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
 
 /**
  * xmldb_tool_ltigroupautoenrol_upgrade
@@ -36,7 +35,6 @@ function xmldb_tool_ltigroupautoenrol_upgrade(int $oldversion): bool {
     $dbman = $DB->get_manager();
 
     if ($oldversion < 2024040400) {
-
         // Changing type of field groupslist on table tool_ltigroupautoenrol to text.
         $table = new xmldb_table('tool_ltigroupautoenrol');
         $field = new xmldb_field('groupslist', XMLDB_TYPE_TEXT, null, null, null, null, null, 'use_groupslist');

@@ -17,26 +17,19 @@
 /**
  * GDPR Provider
  *
- * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
  * @package    tool_ltigroupautoenrol
  * @copyright  2026 Ralf Erlebach
  * @author     Ralf Erlebach - https://github.com/ralferlebach
- **/
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
 
 namespace tool_ltigroupautoenrol\privacy;
 
 /**
  * Class provider
  *
- * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @package   tool_ltigroupautoenrol
- * @copyright 23/07/2020 Mfreak.nl | LdesignMedia.nl - Luuk Verhoeven
- * @author    Luuk Verhoeven
- **/
+ */
 class provider implements \core_privacy\local\metadata\null_provider {
-
     /**
      * Get the language string identifier with the component's language file to explain why this plugin stores no data.
      *
@@ -45,5 +38,4 @@ class provider implements \core_privacy\local\metadata\null_provider {
     public static function get_reason(): string {
         return 'privacy:null_reason';
     }
-
 }

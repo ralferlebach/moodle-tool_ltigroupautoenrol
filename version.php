@@ -31,7 +31,7 @@ defined('MOODLE_INTERNAL') || die();
 
 $plugin->version   = 2026030700;        // The current plugin version (Date: YYYYMMDDXX).
 $plugin->requires  = 2024100700;        // Requires this Moodle version (4.5).
-$plugin->supported = [405,502];         // Supported Moodle versions (4.5 to 5.2).
+$plugin->supported = [405, 502];         // Supported Moodle versions (4.5 to 5.2).
 $plugin->component = 'tool_ltigroupautoenrol'; // Full name of the plugin (used for diagnostics).
 $plugin->release   = '1.2';             // Human-readable version name.
 $plugin->maturity  = MATURITY_STABLE;   // This version's maturity level.

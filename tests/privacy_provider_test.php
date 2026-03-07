@@ -23,12 +23,13 @@
  *
  * @package    tool_ltigroupautoenrol
  * @category   test
- * @copyright  2025 Ralf Erlebach
+ * @copyright  2026 Ralf Erlebach
  * @author     Ralf Erlebach <ralf.erlebach@gmx.de>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 namespace tool_ltigroupautoenrol;
+
 use core_privacy\tests\provider_testcase;
 
 /**
@@ -39,14 +40,8 @@ use core_privacy\tests\provider_testcase;
  * or does not implement the userlist_provider interface (indicating it does not expose user lists).
  * This is important for GDPR compliance and data protection.
  *
- * @package    tool_ltigroupautoenrol
- * @category   test
- * @copyright  2025 Ralf Erlebach
- * @author     Ralf Erlebach <ralf.erlebach@gmx.de>
- * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 final class privacy_provider_test extends provider_testcase {
-
     /**
      * Tests that the privacy provider is either a null provider or does not implement userlist provider.
      *

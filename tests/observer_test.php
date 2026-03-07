@@ -22,13 +22,15 @@
  *
  * @package    tool_ltigroupautoenrol
  * @category   test
- * @copyright  2025 Ralf Erlebach
+ * @copyright  2026 Ralf Erlebach
  * @author     Ralf Erlebach <ralf.erlebach@gmx.de>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 namespace tool_ltigroupautoenrol;
+
 use core\event\user_enrolment_created;
+use advanced_testcase;
 
 /**
  * Test class for LTI group auto enrolment event observer.
@@ -37,14 +39,8 @@ use core\event\user_enrolment_created;
  * to groups upon LTI enrolment, according to deployment mappings configured
  * in the plugin.
  *
- * @package    tool_ltigroupautoenrol
- * @category   test
- * @copyright  2025 Ralf Erlebach
- * @author     Ralf Erlebach <ralf.erlebach@gmx.de>
- * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 final class observer_test extends advanced_testcase {
-
     /**
      * Name of the main plugin configuration table.
      *
@@ -126,10 +122,14 @@ final class observer_test extends advanced_testcase {
         $event->trigger();
 
         // Assert user is added to both mapped groups.
-        $this->assertTrue(groups_is_member($group1, $user->id),
-            'User should be added to first mapped group');
-        $this->assertTrue(groups_is_member($group2, $user->id),
-            'User should be added to second mapped group');
+        $this->assertTrue(
+            groups_is_member($group1, $user->id),
+            'User should be added to first mapped group'
+        );
+        $this->assertTrue(groups_is_member(
+            $group2, $user->id),
+            'User should be added to second mapped group'
+        );
     }
 
     /**
@@ -160,14 +160,16 @@ final class observer_test extends advanced_testcase {
             'relateduserid'  => $user->id,
             'courseid'       => $course->id,
             'other'          => [
-                'enrol' => 'manual',  // Non-LTI enrolment method.
+                'enrol' => 'manual', // Non-LTI enrolment method.
             ],
         ]);
         $event->trigger();
 
         // Assert user is not added to group.
-        $this->assertFalse(groups_is_member($group, $user->id),
-            'User should not be added to groups for non-LTI enrolments');
+        $this->assertFalse(
+            groups_is_member($group, $user->id),
+            'User should not be added to groups for non-LTI enrolments'
+        );
     }
 
     /**
@@ -209,9 +211,13 @@ final class observer_test extends advanced_testcase {
         $event->trigger();
 
         // Assert user is added to existing group but not the deleted one.
-        $this->assertTrue(groups_is_member($existinggroup, $user->id),
-            'User should be added to existing mapped groups');
-        $this->assertFalse(groups_is_member($tobedeleted, $user->id),
-            'User should not be added to deleted groups');
+        $this->assertTrue(
+            groups_is_member($existinggroup, $user->id),
+            'User should be added to existing mapped groups'
+        );
+        $this->assertFalse(
+            groups_is_member($tobedeleted, $user->id),
+            'User should not be added to deleted groups'
+        );
     }
 }

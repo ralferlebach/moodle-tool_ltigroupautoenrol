@@ -18,7 +18,7 @@
  * Event observers used in tool_ltigroupautoenrol.
  *
  * @package    tool_ltigroupautoenrol
- * @copyright  2026 ralferlebach, based upon tool_groupautoenrol
+ * @copyright  2026 ralferlebach
  * @author     Ralf Erlebach, https://github.com/ralferlebach
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -49,7 +49,7 @@ class observer {
         if (!$ltigroupautoenrol = $DB->get_record('tool_ltigroupautoenrol', ['courseid' => $event->courseid])) {
             return true;
         }
-        
+
         if (empty($ltigroupautoenrol->enable_enrol)) {
             return true;
         }
@@ -57,9 +57,11 @@ class observer {
         $enroldata = $event->get_record_snapshot($event->objecttable, $event->objectid);
 
         // Test, if enrolment was done by LTI.
-        $ltiinformation = \enrol_lti\helper::get_lti_tools(['courseid' => $event->courseid,
-        'enrolid' => $enroldata->enrolid,
-        'ltiversion' => 'LTI-1p3']);
+        $ltiinformation = \enrol_lti\helper::get_lti_tools(
+            ['courseid' => $event->courseid,
+            'enrolid' => $enroldata->enrolid,
+            'ltiversion' => 'LTI-1p3']
+        );
 
         if (empty($ltiinformation)) {
             return true;
@@ -81,7 +83,7 @@ class observer {
      *
      * @throws coding_exception
      */
-    private static function check_and_enrol(stdClass $ltigroupautoenrol, stdClass $ltiinformation, stdClass $enroldata): void {
+    private static function check_and_enrol(\stdClass $ltigroupautoenrol, \stdClass $ltiinformation, \stdClass $enroldata): void {
 
         $allgroupscourse = groups_get_all_groups($ltiinformation->courseid) ?? [];
 
@@ -90,14 +92,16 @@ class observer {
         if (empty($groupstoenroll)) {
             return;
         }
-        
+
         if (empty($groupstoenroll[$ltiinformation->id])) {
             return;
         }
-        
+
         foreach ($groupstoenroll[$ltiinformation->id] as $group) {
             if (array_key_exists($group, $allgroupscourse)) {
-                groups_add_member($group, $enroldata->userid);
+                if (!groups_is_member($group, $enroldata->userid) {
+                    groups_add_member($group, $enroldata->userid);
+                };
             }
         }
     }

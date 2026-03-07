@@ -18,7 +18,7 @@
  * Manage ltigroupautoenrol form
  *
  * @package    tool_ltigroupautoenrol
- * @copyright  2024 Ralf Erlebach
+ * @copyright  2026 Ralf Erlebach
  * @author     Ralf Erlebach - https://github.com/ralferlebach
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -37,13 +37,8 @@ require_once("$CFG->libdir/formslib.php");
 /**
  * Class manage_auto_group_enrol_form
  *
- * @package    tool_ltigroupautoenrol
- * @copyright  2024 Ralf Erlebach
- * @author     Ralf Erlebach - https://github.com/ralferlebach
- * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class manage_lti_group_auto_enrol_form extends moodleform {
-
     /**
      * Definition
      *
@@ -71,7 +66,6 @@ class manage_lti_group_auto_enrol_form extends moodleform {
 
         // Group(s) must be created first.
         if (empty($allgroupscourse)) {
-
             $groupurl = new moodle_url('/group/index.php', ['id' => $course->id]);
             $link = html_writer::link(
                 $groupurl,
@@ -89,7 +83,7 @@ class manage_lti_group_auto_enrol_form extends moodleform {
             $instance->enable_enrol = 0;
             $instance->settings = json_encode([]);
         }
-        
+
         $mform->addElement(
             'checkbox',
             'enable_enrol',
@@ -116,19 +110,18 @@ class manage_lti_group_auto_enrol_form extends moodleform {
 
         $i = 0;
         foreach ($ltitools as $toolid => $ltitool) {
-
-            $mform->addElement('hidden', 'ltitoolid_'.$i, $ltitool->id);
-            $mform->setType('ltitoolid_'.$i, PARAM_TEXT);
+            $mform->addElement('hidden', 'ltitoolid_' . $i, $ltitool->id);
+            $mform->setType('ltitoolid_' . $i, PARAM_TEXT);
 
             $select = $mform->addElement(
                 'select',
-                'groupslist_'.$i,
-                get_string('auto_group_form_groupslist', 'tool_ltigroupautoenrol'). $ltitool->name,
+                'groupslist_' . $i,
+                get_string('auto_group_form_groupslist', 'tool_ltigroupautoenrol') . $ltitool->name,
                 $fields
             );
             $select->setMultiple(true);
-            $mform->disabledIf('groupslist_'.$i, 'enable_enrol');
-            $mform->setDefault('groupslist_'.$i, $ltitoolgroup[$toolid] ?? []);
+            $mform->disabledIf('groupslist_' . $i, 'enable_enrol');
+            $mform->setDefault('groupslist_' . $i, $ltitoolgroup[$toolid] ?? []);
 
             $i++;
         }
