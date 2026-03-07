@@ -1,6 +1,6 @@
 # Moodle-admin_tool_ltigroupautoenrol
 
-Version 1.0 (stable version) for Moodle 4.1 onwards
+Version 1.2 (stable version) for Moodle 4.5 onwards
 
 Plugin to automatically enrol users to pre-defined group(s) when enroling in a course that is shared via LTI. This allows moodle administrators and teachers who act as LTI providers to only maintain one course but differentiating the users coming from different consumers.
 
@@ -10,14 +10,14 @@ This plugin is derived from tool_autoenrolingroups plugin.
 - The plugin uses \core\event\user_enrolment_created (user_enrolled) Moodle event
 - If a selected group is deleted, the plugin will ignore it.
 
-## In this stable version (1.0) :
+## In this stable version (1.2) :
 - GDPR implementation
 - you can choose to enable the plugin in each course
 - you can choose to auto-enrol students in one or more groups each LTI tool deployment#
-- only works with LTI 1.3 Advance
+- (only) works with LTI 1.3 Advance
 
 ## Compatibility :
-- Tested with Moodle 4.4 and LTI 1.3 Advance
+- Tested with Moodle 4.5 and LTI 1.3 Advance
 
 # Installation
 * Copy the directory 'ltigroupautoenrol' into the `moodledir/admin/tool` directory.
@@ -27,10 +27,8 @@ This plugin is derived from tool_autoenrolingroups plugin.
 Note : this link appears even if the plugin is not enabled for the course
 
 # License
-* @copyright  2024 Ralf Erlebach
+* @copyright  2026 Ralf Erlebach
 * @author     Ralf Erlebach -https://github.com/ralferlebach
-* @author     Pascal M - https://github.com/pascal-my
-* @author     Luuk Verhoeven - https://github.com/luukverhoeven
 
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 
