@@ -66,11 +66,15 @@ final class privacy_provider_test extends provider_testcase {
         $hasuserlistprovider = isset($interfaces[\core_privacy\local\request\userlist_provider::class]);
 
         // Assert that the provider does not expose user list data.
-        $this->assertFalse($hasuserlistprovider,
-            'Privacy provider should not implement userlist_provider interface');
+        $this->assertFalse(
+            $hasuserlistprovider,
+            'Privacy provider should not implement userlist_provider interface'
+        );
 
         // Assert that it's either a null provider OR doesn't have userlist capabilities.
-        $this->assertTrue($isnullprovider || !$hasuserlistprovider,
-            'Privacy provider must be either a null_provider or not implement userlist_provider');
+        $this->assertTrue(
+            $isnullprovider || !$hasuserlistprovider,
+            'Privacy provider must be either a null_provider or not implement userlist_provider'
+        );
     }
 }

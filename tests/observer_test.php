@@ -126,8 +126,8 @@ final class observer_test extends advanced_testcase {
             groups_is_member($group1, $user->id),
             'User should be added to first mapped group'
         );
-        $this->assertTrue(groups_is_member(
-            $group2, $user->id),
+        $this->assertTrue(
+            groups_is_member($group2, $user->id),
             'User should be added to second mapped group'
         );
     }

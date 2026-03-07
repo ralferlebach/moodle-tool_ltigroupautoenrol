@@ -99,7 +99,7 @@ class observer {
 
         foreach ($groupstoenroll[$ltiinformation->id] as $group) {
             if (array_key_exists($group, $allgroupscourse)) {
-                if (!groups_is_member($group, $enroldata->userid) {
+                if (!groups_is_member($group, $enroldata->userid)) {
                     groups_add_member($group, $enroldata->userid);
                 };
             }
