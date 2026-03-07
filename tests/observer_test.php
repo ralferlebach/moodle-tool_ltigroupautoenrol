@@ -17,6 +17,10 @@
 /**
  * Unit tests for event handling in LTI group auto enrolment tool.
  *
+ * This test class exercises the private check_and_enrol() helper of the
+ * observer class via reflection, verifying that users are correctly added
+ * to mapped groups upon LTI enrolment.
+ *
  * @package    tool_ltigroupautoenrol
  * @category   test
  * @copyright  2026 Ralf Erlebach
@@ -30,8 +34,15 @@ use advanced_testcase;
 
 /**
  * Test class for LTI group auto enrolment event observer.
+ *
+ * @package    tool_ltigroupautoenrol
+ * @category   test
+ * @copyright  2026 Ralf Erlebach
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @covers     \tool_ltigroupautoenrol\observer
  */
 final class observer_test extends advanced_testcase {
+
     /**
      * Sets up the test environment before each test.
      *
@@ -53,12 +64,16 @@ final class observer_test extends advanced_testcase {
      * enrol_lti\helper::get_lti_tools(). For a focused unit test, we exercise the
      * actual group-assignment logic directly.
      *
-     * @param \stdClass $config
-     * @param \stdClass $ltiinformation
-     * @param \stdClass $enroldata
+     * @param \stdClass $config        Plugin configuration for the course.
+     * @param \stdClass $ltiinformation LTI tool information object.
+     * @param \stdClass $enroldata     Enrolment data containing the user id.
      * @return void
      */
-    private function invoke_check_and_enrol(\stdClass $config, \stdClass $ltiinformation, \stdClass $enroldata): void {
+    private function invoke_check_and_enrol(
+        \stdClass $config,
+        \stdClass $ltiinformation,
+        \stdClass $enroldata
+    ): void {
         $method = new \ReflectionMethod(observer::class, 'check_and_enrol');
         $method->setAccessible(true);
         $method->invoke(null, $config, $ltiinformation, $enroldata);
@@ -67,13 +82,18 @@ final class observer_test extends advanced_testcase {
     /**
      * Creates a plugin configuration object for a course.
      *
-     * @param int $courseid
-     * @param int $ltitoolid
-     * @param int[] $groupids
-     * @param bool $enabled
-     * @return \stdClass
+     * @param int   $courseid  The course id.
+     * @param int   $ltitoolid The LTI tool id.
+     * @param int[] $groupids  Array of group ids to map.
+     * @param bool  $enabled   Whether auto-enrolment is enabled.
+     * @return \stdClass The configuration object.
      */
-    private function create_course_mapping(int $courseid, int $ltitoolid, array $groupids, bool $enabled = true): \stdClass {
+    private function create_course_mapping(
+        int $courseid,
+        int $ltitoolid,
+        array $groupids,
+        bool $enabled = true
+    ): \stdClass {
         return (object) [
             'courseid' => $courseid,
             'enable_enrol' => $enabled ? 1 : 0,
@@ -84,6 +104,7 @@ final class observer_test extends advanced_testcase {
     /**
      * Tests that LTI enrolment adds users to mapped groups.
      *
+     * @covers \tool_ltigroupautoenrol\observer::check_and_enrol
      * @return void
      */
     public function test_lti_enrolment_adds_user_to_mapped_groups(): void {
@@ -109,6 +130,7 @@ final class observer_test extends advanced_testcase {
     /**
      * Tests that non-mapped LTI tools are ignored.
      *
+     * @covers \tool_ltigroupautoenrol\observer::check_and_enrol
      * @return void
      */
     public function test_non_lti_enrolment_is_ignored(): void {
@@ -131,6 +153,7 @@ final class observer_test extends advanced_testcase {
     /**
      * Tests that deleted groups are handled gracefully.
      *
+     * @covers \tool_ltigroupautoenrol\observer::check_and_enrol
      * @return void
      */
     public function test_deleted_groups_are_ignored(): void {
