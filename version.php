@@ -15,23 +15,23 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Version info
+ * Version information for tool_ltigroupautoenrol.
  *
  * @package    tool_ltigroupautoenrol
  * @copyright  2024 Ralf Erlebach
- * @author     Ralf Erlebach - https://github.com/ralferlebach
- * based upon tool_ltigroupautoenrol by Pascal M
- * tool_autoenrolingroups https://moodle.org/plugins/tool_groupautoenrol
- * https://github.com/pascal-my/moodle-admin_tool_groupautoenrol
+ * @author     Ralf Erlebach <https://github.com/ralferlebach>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ *
+ * Based upon tool_groupautoenrol by Pascal M.
+ * @see https://moodle.org/plugins/tool_groupautoenrol
+ * @see https://github.com/pascal-my/moodle-admin_tool_groupautoenrol
  */
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version = 2025100700;    // The (date) version of this module + 2 extra digital for daily versions.
-$plugin->requires = 2022112800;   // Requires this Moodle version - at least 4.1.0.
-$plugin->supportedmoodles = [401, 402, 403, 404, 405, 500, 501];
-$plugin->cron = 0;
-$plugin->component = 'tool_ltigroupautoenrol';
-$plugin->release = '1.1';
-$plugin->maturity = MATURITY_STABLE;
+$plugin->version   = 2026030700;        // The current plugin version (Date: YYYYMMDDXX).
+$plugin->requires  = 2024100700;        // Requires this Moodle version (4.5).
+$plugin->supported = [405, 502];        // Supported Moodle versions (4.5 to 5.2).
+$plugin->component = 'tool_ltigroupautoenrol'; // Full name of the plugin (used for diagnostics).
+$plugin->release   = '1.2';             // Human-readable version name.
+$plugin->maturity  = MATURITY_STABLE;   // This version's maturity level.
