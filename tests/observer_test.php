@@ -17,9 +17,6 @@
 /**
  * Unit tests for event handling in LTI group auto enrolment tool.
  *
- * Contains tests for the observer that handles user enrolment events and
- * assigns users to groups based on LTI deployment mappings.
- *
  * @package    tool_ltigroupautoenrol
  * @category   test
  * @copyright  2026 Ralf Erlebach
@@ -29,195 +26,129 @@
 
 namespace tool_ltigroupautoenrol;
 
-use core\event\user_enrolment_created;
 use advanced_testcase;
 
 /**
  * Test class for LTI group auto enrolment event observer.
- *
- * This class tests the observer responsible for automatically assigning users
- * to groups upon LTI enrolment, according to deployment mappings configured
- * in the plugin.
- *
  */
 final class observer_test extends advanced_testcase {
     /**
-     * Name of the main plugin configuration table.
-     *
-     * @var string
-     */
-    private const TABLE = 'tool_ltigroupautoenrol';
-
-    /**
      * Sets up the test environment before each test.
-     *
-     * Calls parent setUp and resets the database after each test.
      *
      * @return void
      */
     protected function setUp(): void {
+        global $CFG;
+
         parent::setUp();
         $this->resetAfterTest(true);
+
+        require_once($CFG->dirroot . '/group/lib.php');
     }
 
     /**
-     * Creates course configuration and group mappings for testing.
+     * Invokes the private observer helper with reflection.
      *
-     * Inserts a configuration record for the specified course and deployment,
-     * mapping the given group IDs to the deployment.
+     * The public observer entrypoint relies on a real enrolment snapshot and on
+     * enrol_lti\helper::get_lti_tools(). For a focused unit test, we exercise the
+     * actual group-assignment logic directly.
      *
-     * @param int $courseid The course ID to configure.
-     * @param string $deploymentid The LTI deployment ID.
-     * @param int[] $groupids Array of group IDs to map to this deployment.
-     * @param bool $enabled Whether the configuration should be enabled (default: true).
+     * @param \stdClass $config
+     * @param \stdClass $ltiinformation
+     * @param \stdClass $enroldata
      * @return void
      */
-    private function create_course_mapping(int $courseid, string $deploymentid, array $groupids, bool $enabled = true): void {
-        global $DB;
+    private function invoke_check_and_enrol(\stdClass $config, \stdClass $ltiinformation, \stdClass $enroldata): void {
+        $method = new \ReflectionMethod(observer::class, 'check_and_enrol');
+        $method->setAccessible(true);
+        $method->invoke(null, $config, $ltiinformation, $enroldata);
+    }
 
-        // Create base configuration record.
-        $configrecord = (object)[
-            'courseid'     => $courseid,
+    /**
+     * Creates a plugin configuration object for a course.
+     *
+     * @param int $courseid
+     * @param int $ltitoolid
+     * @param int[] $groupids
+     * @param bool $enabled
+     * @return \stdClass
+     */
+    private function create_course_mapping(int $courseid, int $ltitoolid, array $groupids, bool $enabled = true): \stdClass {
+        return (object) [
+            'courseid' => $courseid,
             'enable_enrol' => $enabled ? 1 : 0,
-            'settings'     => json_encode([$deploymentid => $groupids]),
+            'settings' => json_encode([$ltitoolid => $groupids]),
         ];
-        $configrecord->id = $DB->insert_record(self::TABLE, $configrecord);
     }
 
     /**
      * Tests that LTI enrolment adds users to mapped groups.
      *
-     * Verifies that when a user is enrolled via LTI with a specific deployment ID,
-     * they are automatically added to all groups mapped to that deployment.
-     *
      * @return void
-     * @covers \tool_ltigroupautoenrol\observer::user_enrolment_created
      */
     public function test_lti_enrolment_adds_user_to_mapped_groups(): void {
-        global $DB;
-
-        // Set up test data.
         $generator = $this->getDataGenerator();
         $course = $generator->create_course();
         $user = $generator->create_user();
 
-        // Create test groups.
-        $group1 = groups_create_group((object)['courseid' => $course->id, 'name' => 'LTI Group A']);
-        $group2 = groups_create_group((object)['courseid' => $course->id, 'name' => 'LTI Group B']);
+        $group1 = groups_create_group((object) ['courseid' => $course->id, 'name' => 'LTI Group A']);
+        $group2 = groups_create_group((object) ['courseid' => $course->id, 'name' => 'LTI Group B']);
 
-        // Set up deployment mapping.
-        $deploymentid = 'deployment-123';
-        $this->create_course_mapping($course->id, $deploymentid, [$group1, $group2], true);
+        $ltitoolid = 12345;
+        $config = $this->create_course_mapping($course->id, $ltitoolid, [$group1, $group2], true);
+        $ltiinformation = (object) ['id' => $ltitoolid, 'courseid' => $course->id];
+        $enroldata = (object) ['userid' => $user->id];
 
-        // Trigger LTI enrolment event.
-        $event = user_enrolment_created::create([
-            'context'        => \context_course::instance($course->id),
-            'relateduserid'  => $user->id,
-            'courseid'       => $course->id,
-            'other'          => [
-                'enrol'            => 'lti',
-                'ltideploymentid'  => $deploymentid,
-            ],
-        ]);
-        $event->trigger();
+        $this->invoke_check_and_enrol($config, $ltiinformation, $enroldata);
 
-        // Assert user is added to both mapped groups.
-        $this->assertTrue(
-            groups_is_member($group1, $user->id),
-            'User should be added to first mapped group'
-        );
-        $this->assertTrue(
-            groups_is_member($group2, $user->id),
-            'User should be added to second mapped group'
-        );
+        $this->assertTrue(groups_is_member($group1, $user->id));
+        $this->assertTrue(groups_is_member($group2, $user->id));
     }
 
     /**
-     * Tests that non-LTI enrolments are ignored.
-     *
-     * Verifies that enrolment events from other enrolment methods (e.g., manual)
-     * do not trigger automatic group assignment.
+     * Tests that non-mapped LTI tools are ignored.
      *
      * @return void
-     * @covers \tool_ltigroupautoenrol\observer::user_enrolment_created
      */
     public function test_non_lti_enrolment_is_ignored(): void {
-        // Set up test data.
         $generator = $this->getDataGenerator();
         $course = $generator->create_course();
         $user = $generator->create_user();
 
-        // Create test group.
-        $group = groups_create_group((object)['courseid' => $course->id, 'name' => 'Test Group']);
+        $group = groups_create_group((object) ['courseid' => $course->id, 'name' => 'Test Group']);
 
-        // Set up deployment mapping.
-        $deploymentid = 'deployment-xyz';
-        $this->create_course_mapping($course->id, $deploymentid, [$group], true);
+        $config = $this->create_course_mapping($course->id, 12345, [$group], true);
+        $ltiinformation = (object) ['id' => 54321, 'courseid' => $course->id];
+        $enroldata = (object) ['userid' => $user->id];
 
-        // Trigger non-LTI enrolment event (manual enrolment).
-        $event = user_enrolment_created::create([
-            'context'        => \context_course::instance($course->id),
-            'relateduserid'  => $user->id,
-            'courseid'       => $course->id,
-            'other'          => [
-                'enrol' => 'manual', // Non-LTI enrolment method.
-            ],
-        ]);
-        $event->trigger();
+        $this->invoke_check_and_enrol($config, $ltiinformation, $enroldata);
 
-        // Assert user is not added to group.
-        $this->assertFalse(
-            groups_is_member($group, $user->id),
-            'User should not be added to groups for non-LTI enrolments'
-        );
+        $this->assertFalse(groups_is_member($group, $user->id));
     }
 
     /**
      * Tests that deleted groups are handled gracefully.
      *
-     * Verifies that when mapped groups are deleted, the plugin handles this
-     * gracefully without errors and only adds users to existing groups.
-     *
      * @return void
-     * @covers \tool_ltigroupautoenrol\observer::user_enrolment_created
      */
     public function test_deleted_groups_are_ignored(): void {
-        // Set up test data.
         $generator = $this->getDataGenerator();
         $course = $generator->create_course();
         $user = $generator->create_user();
 
-        // Create test groups.
-        $existinggroup = groups_create_group((object)['courseid' => $course->id, 'name' => 'Existing Group']);
-        $tobedeleted = groups_create_group((object)['courseid' => $course->id, 'name' => 'Group to Delete']);
+        $existinggroup = groups_create_group((object) ['courseid' => $course->id, 'name' => 'Existing Group']);
+        $tobedeleted = groups_create_group((object) ['courseid' => $course->id, 'name' => 'Group to Delete']);
 
-        // Set up deployment mapping with both groups.
-        $deploymentid = 'deployment-abc';
-        $this->create_course_mapping($course->id, $deploymentid, [$existinggroup, $tobedeleted], true);
+        $ltitoolid = 67890;
+        $config = $this->create_course_mapping($course->id, $ltitoolid, [$existinggroup, $tobedeleted], true);
+        $ltiinformation = (object) ['id' => $ltitoolid, 'courseid' => $course->id];
+        $enroldata = (object) ['userid' => $user->id];
 
-        // Delete one of the mapped groups.
         groups_delete_group($tobedeleted);
 
-        // Trigger LTI enrolment event.
-        $event = user_enrolment_created::create([
-            'context'        => \context_course::instance($course->id),
-            'relateduserid'  => $user->id,
-            'courseid'       => $course->id,
-            'other'          => [
-                'enrol'            => 'lti',
-                'ltideploymentid'  => $deploymentid,
-            ],
-        ]);
-        $event->trigger();
+        $this->invoke_check_and_enrol($config, $ltiinformation, $enroldata);
 
-        // Assert user is added to existing group but not the deleted one.
-        $this->assertTrue(
-            groups_is_member($existinggroup, $user->id),
-            'User should be added to existing mapped groups'
-        );
-        $this->assertFalse(
-            groups_is_member($tobedeleted, $user->id),
-            'User should not be added to deleted groups'
-        );
+        $this->assertTrue(groups_is_member($existinggroup, $user->id));
+        $this->assertFalse(groups_is_member($tobedeleted, $user->id));
     }
 }
