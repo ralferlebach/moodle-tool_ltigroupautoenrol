@@ -90,6 +90,7 @@ final class observer_test extends advanced_testcase {
         $generator = $this->getDataGenerator();
         $course = $generator->create_course();
         $user = $generator->create_user();
+        $generator->enrol_user($user->id, $course->id);
 
         $group1 = groups_create_group((object) ['courseid' => $course->id, 'name' => 'LTI Group A']);
         $group2 = groups_create_group((object) ['courseid' => $course->id, 'name' => 'LTI Group B']);
@@ -114,6 +115,7 @@ final class observer_test extends advanced_testcase {
         $generator = $this->getDataGenerator();
         $course = $generator->create_course();
         $user = $generator->create_user();
+        $generator->enrol_user($user->id, $course->id);
 
         $group = groups_create_group((object) ['courseid' => $course->id, 'name' => 'Test Group']);
 
@@ -135,6 +137,7 @@ final class observer_test extends advanced_testcase {
         $generator = $this->getDataGenerator();
         $course = $generator->create_course();
         $user = $generator->create_user();
+        $generator->enrol_user($user->id, $course->id);
 
         $existinggroup = groups_create_group((object) ['courseid' => $course->id, 'name' => 'Existing Group']);
         $tobedeleted = groups_create_group((object) ['courseid' => $course->id, 'name' => 'Group to Delete']);

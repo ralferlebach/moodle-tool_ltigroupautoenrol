@@ -101,7 +101,7 @@ class observer {
             if (array_key_exists($group, $allgroupscourse)) {
                 if (!groups_is_member($group, $enroldata->userid)) {
                     groups_add_member($group, $enroldata->userid);
-                };
+                }
             }
         }
     }
