@@ -42,7 +42,6 @@ use advanced_testcase;
  * @covers     \tool_ltigroupautoenrol\observer
  */
 final class observer_test extends advanced_testcase {
-
     /**
      * Sets up the test environment before each test.
      *
