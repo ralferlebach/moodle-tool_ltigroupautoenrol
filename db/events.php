@@ -23,11 +23,11 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-defined('MOODLE_INTERNAL') || die;
+defined('MOODLE_INTERNAL') || die();
 
 $observers = [
     [
         'eventname' => '\core\event\user_enrolment_created',
-        'callback' => 'tool_ltigroupautoenrol_observer::user_is_enrolled',
+        'callback' => '\tool_ltigroupautoenrol\observer::user_is_enrolled',
     ],
 ];

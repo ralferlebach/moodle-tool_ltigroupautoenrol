@@ -18,7 +18,7 @@
  * Version information for tool_ltigroupautoenrol.
  *
  * @package    tool_ltigroupautoenrol
- * @copyright  2024 Ralf Erlebach
+ * @copyright  2024-2026 Ralf Erlebach
  * @author     Ralf Erlebach <https://github.com/ralferlebach>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  *
@@ -31,7 +31,7 @@ defined('MOODLE_INTERNAL') || die();
 
 $plugin->version   = 2026030700;        // The current plugin version (Date: YYYYMMDDXX).
 $plugin->requires  = 2024100700;        // Requires this Moodle version (4.5).
-$plugin->supported = [405, 502];        // Supported Moodle versions (4.5 to 5.2).
+$plugin->supported = [405,502];         // Supported Moodle versions (4.5 to 5.2).
 $plugin->component = 'tool_ltigroupautoenrol'; // Full name of the plugin (used for diagnostics).
 $plugin->release   = '1.2';             // Human-readable version name.
 $plugin->maturity  = MATURITY_STABLE;   // This version's maturity level.

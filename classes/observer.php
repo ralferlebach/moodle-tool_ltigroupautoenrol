@@ -18,18 +18,19 @@
  * Event observers used in tool_ltigroupautoenrol.
  *
  * @package    tool_ltigroupautoenrol
- * @copyright  2024 ralferlebach, based upon tool_groupautoenrol
+ * @copyright  2026 ralferlebach, based upon tool_groupautoenrol
  * @author     Ralf Erlebach, https://github.com/ralferlebach
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
+
+namespace tool_ltigroupautoenrol;
 
 use core\event\user_enrolment_created;
 
 /**
  * Event observer for tool_ltigroupautoenrol.
  */
-class tool_ltigroupautoenrol_observer {
-
+class observer {
     /**
      * Triggered via core\event\user_enrolment_created (user_enrolled)
      * Action when user is enrolled
@@ -45,8 +46,10 @@ class tool_ltigroupautoenrol_observer {
         require_once($CFG->dirroot . '/group/lib.php');
 
         // Test, if the course has ltigroupautoenrol enabled.
-        $ltigroupautoenrol = $DB->get_record('tool_ltigroupautoenrol', ['courseid' => $event->courseid]);
-
+        if (!$ltigroupautoenrol = $DB->get_record('tool_ltigroupautoenrol', ['courseid' => $event->courseid])) {
+            return true;
+        }
+        
         if (empty($ltigroupautoenrol->enable_enrol)) {
             return true;
         }
@@ -80,14 +83,18 @@ class tool_ltigroupautoenrol_observer {
      */
     private static function check_and_enrol(stdClass $ltigroupautoenrol, stdClass $ltiinformation, stdClass $enroldata): void {
 
-        $allgroupscourse = groups_get_all_groups($ltiinformation->courseid);
+        $allgroupscourse = groups_get_all_groups($ltiinformation->courseid) ?? [];
 
         $groupstoenroll = json_decode($ltigroupautoenrol->settings, true);
 
         if (empty($groupstoenroll)) {
             return;
         }
-
+        
+        if (empty($groupstoenroll[$ltiinformation->id])) {
+            return;
+        }
+        
         foreach ($groupstoenroll[$ltiinformation->id] as $group) {
             if (array_key_exists($group, $allgroupscourse)) {
                 groups_add_member($group, $enroldata->userid);

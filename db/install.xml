@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<XMLDB PATH="admin/tool/ltigroupautoenrol/db" VERSION="20240404" COMMENT="XMLDB file for Moodle admin/tool/groupautoenrol"
+<XMLDB PATH="admin/tool/ltigroupautoenrol/db" VERSION="20240404" COMMENT="XMLDB file for Moodle admin/tool/ltigroupautoenrol"
        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
        xsi:noNamespaceSchemaLocation="../../../../lib/xmldb/xmldb.xsd"
 >
