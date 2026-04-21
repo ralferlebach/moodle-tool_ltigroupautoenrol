@@ -4,7 +4,7 @@ Version 1.1 (stable version) for Moodle 4.5 onwards
 
 Plugin to automatically enrol users to pre-defined group(s) when enroling in a course that is shared via LTI. This allows moodle administrators and teachers who act as LTI providers to only maintain one course but differentiating the users coming from different consumers.
 
-This plugin is derived from tool_autoenrolingroups plugin.
+This plugin is derived from tool_groupautoenrol plugin.
 
 ## Things to know :
 - The plugin uses \core\event\user_enrolment_created (user_enrolled) Moodle event
