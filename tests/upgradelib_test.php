@@ -23,7 +23,8 @@ use tool_ltigroupautoenrol\local\config_repository;
  *
  * The plugin table is recreated from the original install.xml of each supported baseline
  * (tests/fixtures/install_<version>.xml, taken unchanged from the git history: 0.1 = 2024050100,
- * the published 1.0.1 = 2024100600 and 1.1 = 2026030700), filled with data in the format that
+ * the published 1.0.1 = 2024100600, 1.1 = 2026030700 and the pre-release
+ * state of 2026100800 from pull request #11 = 2026100800_pr11), filled with data in the format that
  * version wrote, and upgraded with the real upgrade function. The result must equal a fresh install
  * (install.xml), keep every mapping and back up everything it removes. tearDown() recreates the
  * current table, so other tests always see the current schema.
@@ -82,9 +83,26 @@ final class upgradelib_test extends \advanced_testcase {
         // The fixtures are kept verbatim; their PATH attribute names db/, so they are parsed as if they were
         // db/install.xml (xmldb checks that PATH matches the file location).
         $structure = new \xmldb_structure($CFG->dirroot . '/admin/tool/ltigroupautoenrol/db/install.xml');
-        $structure->arr2xmldb_structure(xmlize(file_get_contents($file)));
+        $structure->arr2xmldb_structure($this->parse_xml(file_get_contents($file)));
         $this->assertTrue($structure->isLoaded(), "Cannot load $file: " . $structure->getError());
         $dbman->create_table($structure->getTable('tool_ltigroupautoenrol'));
+    }
+
+    /**
+     * Parses an XMLDB file the way xmldb_file does on the running Moodle version.
+     *
+     * Moodle 5.1 deprecated xmlize() in favour of \core\xml_parser (MDL-86256); Moodle 4.5 only has xmlize().
+     *
+     * @param string $contents
+     * @return array
+     */
+    private function parse_xml(string $contents): array {
+        global $CFG;
+        if (class_exists(\core\xml_parser::class)) {
+            return (new \core\xml_parser())->parse($contents);
+        }
+        require_once($CFG->libdir . '/xmlize.php');
+        return xmlize($contents);
     }
 
     /**
@@ -96,9 +114,12 @@ final class upgradelib_test extends \advanced_testcase {
     private function upgrade_from(int $version): string {
         set_config('version', $version, 'tool_ltigroupautoenrol');
         ob_start();
-        $this->assertTrue(xmldb_tool_ltigroupautoenrol_upgrade($version));
-        $output = ob_get_clean();
-        $this->assertEquals(2026100800, get_config('tool_ltigroupautoenrol', 'version'));
+        try {
+            $this->assertTrue(xmldb_tool_ltigroupautoenrol_upgrade($version));
+        } finally {
+            $output = ob_get_clean();
+        }
+        $this->assertEquals(2026100801, get_config('tool_ltigroupautoenrol', 'version'));
         return $output;
     }
 
@@ -235,6 +256,35 @@ final class upgradelib_test extends \advanced_testcase {
     public function test_upgrade_is_idempotent_on_current_schema(): void {
         $this->assertSame('', $this->upgrade_from(2026030700));
         $this->assert_schema_matches_install_xml();
+    }
+
+    /**
+     * Upgrade from the pre-release state of 2026100800 (pull request #11): the missing status fields are added,
+     * existing mappings are kept.
+     */
+    public function test_upgrade_from_prerelease_2026100800(): void {
+        global $DB;
+        $this->recreate_table(__DIR__ . '/fixtures/install_2026100800_pr11.xml');
+        $course = $this->getDataGenerator()->create_course();
+        $DB->insert_record('tool_ltigroupautoenrol', (object) [
+            'courseid' => $course->id,
+            'enable_enrol' => 1,
+            'settings' => '{"7":[3]}',
+        ]);
+
+        $output = $this->upgrade_from(2026100800);
+
+        foreach (['backfill_time', 'backfill_result', 'event_errors', 'event_errortime'] as $field) {
+            $this->assertStringContainsString("Added field \"{$field}\".", $output);
+        }
+        $this->assert_schema_matches_install_xml();
+        $record = $DB->get_record('tool_ltigroupautoenrol', ['courseid' => $course->id], '*', MUST_EXIST);
+        $this->assertSame('{"7":[3]}', $record->settings);
+        $this->assertEquals(0, $record->backfill_time);
+        $this->assertEquals(0, $record->event_errors);
+
+        // A site already on the final 2026100800 schema is not touched by the new step.
+        $this->assertSame('', $this->upgrade_from(2026100800));
     }
 
     /**

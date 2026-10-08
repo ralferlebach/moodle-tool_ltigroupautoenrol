@@ -51,5 +51,15 @@ function xmldb_tool_ltigroupautoenrol_upgrade(int $oldversion): bool {
 
         upgrade_plugin_savepoint(true, 2026100800, 'tool', 'ltigroupautoenrol');
     }
+
+    if ($oldversion < 2026100801) {
+        // Sites that installed the pre-release state of 2026100800 (pull request #11) lack the backfill status
+        // and event error fields. The step only adds missing fields, so it is a no-op everywhere else.
+        foreach (tool_ltigroupautoenrol_upgrade_add_backfill_status() as $line) {
+            mtrace('tool_ltigroupautoenrol: ' . $line);
+        }
+
+        upgrade_plugin_savepoint(true, 2026100801, 'tool', 'ltigroupautoenrol');
+    }
     return true;
 }

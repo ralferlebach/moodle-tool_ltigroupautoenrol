@@ -9,7 +9,7 @@ Moodle admin tool plugin which automatically adds users to pre-defined groups wh
 Requirements
 ------------
 
-This plugin requires Moodle 4.5+ and is supported up to Moodle 5.2.
+This plugin requires Moodle 4.5+ and is supported up to Moodle 5.3.
 
 It works with LTI 1.3 (LTI Advantage) tools published by Moodle's "Publish as LTI tool" enrolment method (enrol_lti). LTI 1.1 tools are ignored.
 
@@ -26,9 +26,12 @@ Installation
 ------------
 
 Install the plugin like any other plugin to folder
-/admin/tool/ltigroupautoenrol
+/admin/tool/ltigroupautoenrol (Moodle 4.5 and 5.0) or
+/public/admin/tool/ltigroupautoenrol (Moodle 5.1 and later)
 
 See http://docs.moodle.org/en/Installing_plugins for details on installing Moodle plugins
+
+Upgrading from an earlier version of this plugin: please read the upgrade notes in docs/CHANGES.md first (backup, read-only pre-upgrade check, rollback).
 
 
 Usage & Settings
@@ -89,31 +92,6 @@ Pitfalls:
 * **Lifecycle:** When a course is deleted, its configuration is deleted. When an LTI enrolment method instance or a group is deleted, it is removed from the configuration. Existing group memberships are not touched by the plugin.
 * **Errors never block an enrolment.** If a group membership can not be added for a new enrolment, the enrolment itself succeeds; the failure is reported in Moodle's debugging output (course and number only). The background assignment records failures in its status and is retried by the task API.
 * **Language packs:** Community translations from AMOS override the plugin's own language files. Strings whose meaning changed in 1.2 therefore got new identifiers, so outdated translations of 1.0.1/1.1 are not shown.
-
-
-Upgrading
----------
-
-Supported upgrade baselines: 0.1 (2024050100 - 2024090802), the published 1.0.1 (2024100600) and all versions up to 1.1 (2026030700). The original database schema of each baseline is kept in tests/fixtures; the PHPUnit tests upgrade from each of them, and the CI runs them on PostgreSQL and MariaDB.
-
-The upgrade to 1.2 (2026100800)
-
-* adds the field "settings" to installations that were upgraded from 0.1 and removes the unused tool_groupautoenrol fields of 0.1 (0.1 never evaluated them),
-* removes configurations of deleted courses and duplicate configurations of a course (the oldest row is kept, because it was the one in effect),
-* adds a unique key on the course and the fields for the backfill status,
-* rewrites stored mappings into a canonical format; invalid mappings are kept and ignored at runtime.
-
-Nothing is removed without a backup: every removed value and row is written as JSON to moodledata/tool_ltigroupautoenrol/upgrade-*.json, and the upgrade output names the files.
-
-Recommended procedure:
-
-1. Take a database backup and a backup of moodledata.
-2. Put the new plugin code in place and run the read-only check before the upgrade:
-   `php admin/tool/ltigroupautoenrol/cli/check_upgrade.php`
-   It lists legacy fields, configurations of deleted courses, duplicate configurations per course and invalid mappings - everything the upgrade will back up, remove or keep - and changes nothing.
-3. Run the upgrade and keep its output.
-
-Rollback: Moodle does not support downgrading a plugin. Restore the database backup together with the previous plugin code. Single removed rows can also be restored from the JSON backup files.
 
 
 Data privacy
@@ -181,9 +159,9 @@ There may be several weeks after a new major release of Moodle has been publishe
 
 This plugin is designed to be compatible with all currently supported versions of Moodle, leveraging its latest APIs. However, if you are using a legacy version of Moodle, we kindly advise against installing or using this plugin. Instead, we strongly recommend updating your Moodle instance to a supported version to ensure security and compliance with current technological standards. Thank you for your understanding.
 
-The continuous integration tests these combinations: Moodle 4.5 with PHP 8.1 and 8.3, Moodle 5.0 and 5.1 with PHP 8.4, Moodle 5.2 with PHP 8.3 and 8.4, each with PostgreSQL and MariaDB (Moodle 4.5/PHP 8.1 with PostgreSQL only). As long as Moodle 4.5 is supported, the PHPUnit tests keep the PHPUnit 9 conventions (@covers and @dataProvider annotations in docblocks).
+The continuous integration tests these combinations: Moodle 4.5 with PHP 8.1 and 8.3, Moodle 5.0 and 5.1 with PHP 8.4, Moodle 5.2 and 5.3 with PHP 8.3 and 8.4, each with PostgreSQL and MariaDB (PHP 8.1 and PHP 8.3 on Moodle 5.2/5.3 with PostgreSQL only). Moodle 5.3 runs on PostgreSQL 17 and MariaDB 11.4, the older branches on PostgreSQL 16 and MariaDB 10.11. As long as Moodle 4.5 is supported, the PHPUnit tests keep the PHPUnit 9 conventions (@covers and @dataProvider annotations in docblocks).
 
-Tests: PHPUnit (incl. upgrade tests from the historical schemas, uninstall/reinstall and query budgets), Behat (incl. axe accessibility checks) and Playwright browser tests (tests/playwright: page identity, axe, keyboard and focus, reflow at 200 %/400 % zoom and on a phone, German user interface, access denial).
+Tests: PHPUnit (incl. upgrade tests from the historical schemas, uninstall/reinstall and query budgets), Behat (incl. axe accessibility checks) and Playwright browser tests on Moodle 4.5 and 5.3 (tests/playwright: page identity, axe, keyboard and focus, reflow at 200 %/400 % zoom and on a phone, German user interface, access denial).
 
 
 Translating this plugin

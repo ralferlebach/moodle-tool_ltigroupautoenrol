@@ -17,7 +17,7 @@
 /**
  * Upgrade helpers for tool_ltigroupautoenrol.
  *
- * Supported upgrade baselines (see README, section "Upgrading"); the original install.xml of each
+ * Supported upgrade baselines (see docs/CHANGES.md, section "Upgrading"); the original install.xml of each
  * baseline is kept in tests/fixtures and the upgrade is tested from each of them:
  * - 0.1 (2024050100 - 2024090802): schema inherited from tool_groupautoenrol
  *   (rolelist, enrol_method, profile_field, use_groupslist, groupslist, balises), no "settings" field.
