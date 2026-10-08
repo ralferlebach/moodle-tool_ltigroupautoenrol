@@ -1,0 +1,13 @@
+{
+  "name": "tool_ltigroupautoenrol-playwright",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Browser, accessibility, keyboard and reflow tests for tool_ltigroupautoenrol against a live Moodle site.",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1",
+    "@axe-core/playwright": "4.10.2"
+  }
+}

@@ -161,7 +161,7 @@ This plugin is designed to be compatible with all currently supported versions o
 
 The continuous integration tests these combinations: Moodle 4.5 with PHP 8.1 and 8.3, Moodle 5.0 and 5.1 with PHP 8.4, Moodle 5.2 and 5.3 with PHP 8.3 and 8.4, each with PostgreSQL and MariaDB (PHP 8.1 and PHP 8.3 on Moodle 5.2/5.3 with PostgreSQL only). Moodle 5.3 runs on PostgreSQL 17 and MariaDB 11.4, the older branches on PostgreSQL 16 and MariaDB 10.11. As long as Moodle 4.5 is supported, the PHPUnit tests keep the PHPUnit 9 conventions (@covers and @dataProvider annotations in docblocks).
 
-Tests: PHPUnit (incl. upgrade tests from the historical schemas, uninstall/reinstall and query budgets), Behat (incl. axe accessibility checks) and Playwright browser tests on Moodle 4.5 and 5.3 (tests/playwright: page identity, axe, keyboard and focus, reflow at 200 %/400 % zoom and on a phone, German user interface, access denial).
+Tests: PHPUnit (incl. upgrade tests from the historical schemas, uninstall/reinstall and query budgets), a real site upgrade from the published 1.0.1 on Moodle 4.5 and 5.3 with PostgreSQL and MariaDB (tests/upgrade), Behat (incl. axe accessibility checks) and Playwright browser tests on Moodle 4.5 and 5.3 (tests/playwright: page identity, axe, keyboard and focus, reflow at 200 %/400 % zoom and on a phone, German user interface, access denial).
 
 
 Translating this plugin

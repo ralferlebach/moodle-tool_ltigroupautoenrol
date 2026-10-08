@@ -1,0 +1,116 @@
+name: Playwright
+
+# Browser tests against a live Moodle site (settings and backfill pages): page identity and HTTP
+# status, axe (WCAG 2.1 A/AA), keyboard operation and focus, reflow at 200 %/400 % zoom and on a
+# phone, German UI with the official language pack, access denial. Runs on every push and pull
+# request on the lower (4.5 LTS) and the upper (5.3) supported Moodle branch; adapted from
+# ralferlebach/moodle-plugintemplate.
+
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  playwright:
+    runs-on: ubuntu-22.04
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Moodle 4.5: classic layout, web root = Moodle root.
+          - {moodle-branch: MOODLE_405_STABLE, php: '8.3', pg: '16', langpack: '4.5', plugin-path: admin/tool/ltigroupautoenrol, webroot: moodle}
+          # Moodle 5.3: public/ layout (since 5.1), PostgreSQL >= 17.
+          - {moodle-branch: MOODLE_503_STABLE, php: '8.4', pg: '17', langpack: '5.3', plugin-path: public/admin/tool/ltigroupautoenrol, webroot: moodle/public}
+
+    services:
+      postgres:
+        image: postgres:${{ matrix.pg }}
+        env:
+          POSTGRES_USER: moodle
+          POSTGRES_PASSWORD: moodle
+          POSTGRES_DB: moodle
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready" --health-interval=10s
+          --health-timeout=5s --health-retries=5
+
+    env:
+      MOODLE_BRANCH: ${{ matrix.moodle-branch }}
+      MOODLE_WWWROOT: http://127.0.0.1:8000
+      PLUGIN_PATH: ${{ matrix.plugin-path }}
+      MOODLE_WEBROOT: ${{ matrix.webroot }}
+      LANGPACK: ${{ matrix.langpack }}
+
+    steps:
+      - name: Check out plugin
+        uses: actions/checkout@v4
+        with:
+          path: plugin
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: pgsql, gd, intl, zip, soap, mbstring, curl, xml, exif
+          ini-values: max_input_vars=5000
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Check out Moodle and install the plugin
+        run: |
+          git clone --depth 1 --branch "$MOODLE_BRANCH" https://github.com/moodle/moodle.git moodle
+          mkdir -p "$(dirname "moodle/$PLUGIN_PATH")"
+          cp -a plugin "moodle/$PLUGIN_PATH"
+          rm -rf "moodle/$PLUGIN_PATH/.git"
+          # Since Moodle 5.1, third-party libraries (Guzzle, Slim, Mustache, ...) come from Composer.
+          cd moodle && composer install --no-interaction --no-dev --no-progress
+
+      - name: Install Moodle site with the German language pack
+        run: |
+          mkdir -p /tmp/moodledata/lang
+          curl -sSL -o /tmp/de.zip https://download.moodle.org/download.php/direct/langpack/$LANGPACK/de.zip
+          unzip -q /tmp/de.zip -d /tmp/moodledata/lang
+          cd moodle
+          php admin/cli/install.php \
+            --non-interactive --agree-license \
+            --dbtype=pgsql --dbhost=127.0.0.1 --dbport=5432 --dbname=moodle \
+            --dbuser=moodle --dbpass=moodle \
+            --wwwroot="$MOODLE_WWWROOT" --dataroot=/tmp/moodledata \
+            --fullname="CI" --shortname="CI" \
+            --adminpass="Admin!23" --adminemail=ci@example.invalid
+
+      - name: Seed fixture
+        run: |
+          cd moodle
+          php "$PLUGIN_PATH/tests/playwright/seed.php" > /tmp/ltigae-seed.env
+          sed -n "s/^export \([A-Z_][A-Z_]*\)='\(.*\)'$/\1=\2/p" /tmp/ltigae-seed.env >> "$GITHUB_ENV"
+
+      - name: Install Playwright and browser
+        run: |
+          cd "moodle/$PLUGIN_PATH/tests/playwright"
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Run Playwright tests
+        run: |
+          cd "moodle/$PLUGIN_PATH/tests/playwright"
+          PHP_CLI_SERVER_WORKERS=8 php -S 127.0.0.1:8000 -t "$GITHUB_WORKSPACE/$MOODLE_WEBROOT" \
+            >/tmp/moodle-server.log 2>&1 &
+          for i in $(seq 1 40); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 http://127.0.0.1:8000/login/index.php || true)
+            [ "$code" = "200" ] && break
+            sleep 3
+          done
+          [ "$code" = "200" ] || { echo "Moodle not reachable (HTTP $code)"; tail -50 /tmp/moodle-server.log; exit 1; }
+          npm test
+
+      - name: Upload report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ matrix.moodle-branch }}-${{ github.sha }}
+          path: moodle/${{ env.PLUGIN_PATH }}/tests/playwright/playwright-report
+          retention-days: 14

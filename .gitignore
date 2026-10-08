@@ -71,6 +71,7 @@ node_modules/
 tests/playwright/playwright-report/
 tests/playwright/test-results/
 tests/playwright/blob-report/
+tests/playwright/node_modules/
 tests/load/apache-jmeter-*/
 tests/load/jmeter-report/
 tests/load/*.jtl

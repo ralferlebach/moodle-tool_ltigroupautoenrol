@@ -2,7 +2,7 @@
 
 ## Upgrading
 
-Supported upgrade baselines: 0.1 (2024050100 - 2024090802), the published 1.0.1 (2024100600) and all versions up to 1.1 (2026030700). The original database schema of each baseline is kept in tests/fixtures; the PHPUnit tests upgrade from each of them, and the CI runs them on PostgreSQL and MariaDB.
+Supported upgrade baselines: 0.1 (2024050100 - 2024090802), the published 1.0 (2024093000) and 1.0.1 (2024100600) and all versions up to 1.1 (2026030700). The original database schema of each baseline is kept in tests/fixtures (checked against the ZIPs published in the Moodle plugins directory); the PHPUnit tests upgrade from each of them, and the CI runs them on PostgreSQL and MariaDB. In addition, the CI job `upgrade-e2e` upgrades a real site from the published 1.0.1 exactly as described below.
 
 The upgrade to 1.2 (2026100800, 2026100801)
 
@@ -26,6 +26,12 @@ Recommended procedure:
 Rollback: Moodle does not support downgrading a plugin. Restore the database backup together with the previous plugin code. Single removed rows can also be restored from the JSON backup files.
 
 # Changelog
+
+## 1.2 (2026100802)
+
+- Fix: the read-only pre-upgrade check `cli/check_upgrade.php` failed with "Class tool_ltigroupautoenrol\local\mapping not found" when run as documented, i.e. with the new code in place but before the upgrade (Moodle's class cache still describes the installed version, which had no classes/local). db/upgradelib.php now loads its classes explicitly; the upgrade itself is covered the same way.
+- Real site upgrade test (tests/upgrade/upgrade_e2e.sh, CI job `upgrade-e2e`): installs the published 1.0.1, stores a duplicate and an orphaned configuration, runs the read-only check, upgrades and requires "Database structure is ok.", one row per course with the kept mapping, the unique key and a backup of every removed row. Runs on Moodle 4.5 and 5.3 with PostgreSQL and MariaDB.
+- The published ZIPs of 1.0 (2024093000), 1.0.1 (2024100600) and 1.1 (2026030700) were downloaded from the Moodle plugins directory (MD5 as published) and compared: their install.xml files are identical to tests/fixtures (1.0 has the 1.0.1 schema), the 1.0.1 code is identical to git fd456f3, 1.1 differs from git 104b1c3 only in README.md.
 
 ## 1.2 (2026100801)
 

@@ -35,6 +35,13 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+defined('MOODLE_INTERNAL') || die();
+
+// The pre-upgrade check (cli/check_upgrade.php) and the upgrade run while Moodle's class cache still describes
+// the installed version; versions up to 1.1 had no classes/local, so these classes are loaded explicitly.
+require_once(__DIR__ . '/../classes/local/invalid_mapping_exception.php');
+require_once(__DIR__ . '/../classes/local/mapping.php');
+
 /** Fields of the 0.1 schema that no later version uses. */
 const TOOL_LTIGROUPAUTOENROL_LEGACY_FIELDS = [
     'rolelist', 'enrol_method', 'profile_field', 'use_groupslist', 'groupslist', 'balises',
