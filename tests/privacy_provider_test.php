@@ -14,67 +14,70 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
+namespace tool_ltigroupautoenrol;
+
+use core_privacy\tests\provider_testcase;
+use tool_ltigroupautoenrol\task\backfill_task;
+
 /**
- * Unit tests for the privacy provider of tool_ltigroupautoenrol.
+ * Tests that back the null_provider decision with the actual data flows.
  *
- * This file contains tests to ensure that the privacy provider for the
- * LTI Group Auto Enrol plugin correctly implements the required privacy
- * interfaces and does not expose user data inappropriately.
+ * Data flow inventory (see README, section "Privacy and lifecycle"):
+ * - plugin table: course id, enabled flag, tool id => group ids (no user data),
+ * - group memberships: core tables, created via the group API, exported/deleted by core_group,
+ * - backfill task custom data: course id and mapping fingerprint only,
+ * - logs/debugging: course ids and counters only.
  *
  * @package    tool_ltigroupautoenrol
  * @category   test
  * @copyright  2026 Ralf Erlebach
- * @author     Ralf Erlebach <ralf.erlebach@gmx.de>
+ * @author     Ralf Erlebach - https://github.com/ralferlebach
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- */
-
-namespace tool_ltigroupautoenrol;
-
-use core_privacy\tests\provider_testcase;
-
-/**
- * Unit tests for the privacy provider of tool_ltigroupautoenrol.
- *
- * This test class verifies that the privacy provider for the LTI Group Auto Enrol
- * tool either implements the null_provider interface (indicating no personal data is stored)
- * or does not implement the userlist_provider interface (indicating it does not expose user lists).
- * This is important for GDPR compliance and data protection.
- *
+ * @covers     \tool_ltigroupautoenrol\privacy\provider
  */
 final class privacy_provider_test extends provider_testcase {
     /**
-     * Tests that the privacy provider is either a null provider or does not implement userlist provider.
-     *
-     * Ensures that the privacy provider for tool_ltigroupautoenrol either:
-     * 1. Implements the null_provider interface (indicating no personal data is stored), OR
-     * 2. Does not implement the userlist_provider interface (indicating it doesn't expose user lists).
-     *
-     * @return void
-     * @covers \tool_ltigroupautoenrol\privacy\provider
+     * The provider is a null provider with an existing reason string.
      */
-    public function test_provider_is_null_provider_or_has_no_userlists(): void {
-        $this->resetAfterTest(true);
+    public function test_null_provider(): void {
+        $this->assertContains(\core_privacy\local\metadata\null_provider::class, class_implements(privacy\provider::class));
+        $reason = privacy\provider::get_reason();
+        $this->assertTrue(get_string_manager()->string_exists($reason, 'tool_ltigroupautoenrol'));
+    }
 
-        $providerclass = '\\tool_ltigroupautoenrol\\privacy\\provider';
-        $this->assertTrue(class_exists($providerclass), 'Privacy provider class must exist');
+    /**
+     * The plugin table has no column that could hold a user reference.
+     */
+    public function test_plugin_table_holds_no_user_columns(): void {
+        global $DB;
+        $columns = array_keys($DB->get_columns('tool_ltigroupautoenrol'));
+        sort($columns);
+        $this->assertSame(['courseid', 'enable_enrol', 'id', 'settings'], $columns);
+    }
 
-        // Check if it's a null provider (stores no personal data).
-        $interfaces = class_implements($providerclass);
-        $isnullprovider = isset($interfaces[\core_privacy\local\metadata\null_provider::class]);
+    /**
+     * After event assignment and backfill, user ids exist only in core group memberships,
+     * neither in the plugin table nor in the backfill task payload.
+     */
+    public function test_assignment_persists_no_user_data(): void {
+        global $DB;
+        $this->resetAfterTest();
+        $gen = $this->getDataGenerator();
+        $plugingen = $gen->get_plugin_generator('tool_ltigroupautoenrol');
+        $course = $gen->create_course();
+        $tool = $plugingen->create_lti_tool($course->id);
+        $groupid = $gen->create_group(['courseid' => $course->id])->id;
+        $config = $plugingen->create_config($course->id, [$tool->id => [$groupid]]);
+        $user = $gen->create_user(['idnumber' => 'privacy-probe']);
+        $plugingen->enrol_via_lti($tool, $user->id);
 
-        // Check if it implements userlist provider (can expose user lists).
-        $hasuserlistprovider = isset($interfaces[\core_privacy\local\request\userlist_provider::class]);
+        $task = backfill_task::create($course->id, $config->mapping->get_hash());
+        $this->assertSame(['courseid', 'hash'], array_keys((array) $task->get_custom_data()));
 
-        // Assert that the provider does not expose user list data.
-        $this->assertFalse(
-            $hasuserlistprovider,
-            'Privacy provider should not implement userlist_provider interface'
-        );
-
-        // Assert that it's either a null provider OR doesn't have userlist capabilities.
-        $this->assertTrue(
-            $isnullprovider || !$hasuserlistprovider,
-            'Privacy provider must be either a null_provider or not implement userlist_provider'
-        );
+        $this->assertTrue(groups_is_member($groupid, $user->id));
+        $row = $DB->get_record('tool_ltigroupautoenrol', ['courseid' => $course->id], '*', MUST_EXIST);
+        $this->assertSame([(int) $tool->id => [(int) $groupid]], json_decode($row->settings, true));
+        $membership = $DB->get_record('groups_members', ['groupid' => $groupid, 'userid' => $user->id], '*', MUST_EXIST);
+        $this->assertSame('', (string) $membership->component, 'Memberships stay manageable by teachers and core privacy');
     }
 }

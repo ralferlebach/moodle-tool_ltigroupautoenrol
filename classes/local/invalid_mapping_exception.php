@@ -14,32 +14,25 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
+namespace tool_ltigroupautoenrol\local;
+
 /**
- * Observers declaration
+ * Thrown when a stored or submitted tool to group mapping is structurally invalid.
+ *
+ * The debug info names the structural problem only; it never contains user data.
  *
  * @package    tool_ltigroupautoenrol
  * @copyright  2026 Ralf Erlebach
  * @author     Ralf Erlebach - https://github.com/ralferlebach
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-
-defined('MOODLE_INTERNAL') || die();
-
-$observers = [
-    [
-        'eventname' => '\core\event\user_enrolment_created',
-        'callback' => '\tool_ltigroupautoenrol\observer::user_is_enrolled',
-    ],
-    [
-        'eventname' => '\core\event\course_deleted',
-        'callback' => '\tool_ltigroupautoenrol\observer::course_deleted',
-    ],
-    [
-        'eventname' => '\core\event\enrol_instance_deleted',
-        'callback' => '\tool_ltigroupautoenrol\observer::enrol_instance_deleted',
-    ],
-    [
-        'eventname' => '\core\event\group_deleted',
-        'callback' => '\tool_ltigroupautoenrol\observer::group_deleted',
-    ],
-];
+class invalid_mapping_exception extends \moodle_exception {
+    /**
+     * Constructor.
+     *
+     * @param string $debuginfo Description of the structural problem.
+     */
+    public function __construct(string $debuginfo) {
+        parent::__construct('error_invalidmapping', 'tool_ltigroupautoenrol', '', null, $debuginfo);
+    }
+}
