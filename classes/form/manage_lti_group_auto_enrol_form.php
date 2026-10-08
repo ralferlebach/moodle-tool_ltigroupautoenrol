@@ -28,6 +28,9 @@ namespace tool_ltigroupautoenrol\form;
 use html_writer;
 use moodle_url;
 use moodleform;
+use tool_ltigroupautoenrol\local\course_config;
+use tool_ltigroupautoenrol\local\lti_resolver;
+use tool_ltigroupautoenrol\local\mapping;
 
 defined('MOODLE_INTERNAL') || die;
 
@@ -35,10 +38,21 @@ global $CFG;
 require_once("$CFG->libdir/formslib.php");
 
 /**
- * Class manage_auto_group_enrol_form
+ * Settings form of one course.
  *
+ * Expected custom data:
+ * - course (stdClass): the course,
+ * - tools (stdClass[]): LTI 1.3 tools of the course keyed by tool id (server-side allowlist),
+ * - groups (stdClass[]): groups of the course keyed by group id (server-side allowlist),
+ * - config (course_config): the stored configuration.
+ *
+ * The form contains one multi-select per allowlisted tool, named groups_<toolid>. It has no
+ * hidden tool ids or counters, so a submission can only address tools of the current course.
  */
 class manage_lti_group_auto_enrol_form extends moodleform {
+    /** @var string Value core submits for a multi-select without selection. */
+    private const EMPTY_MULTISELECT = '_qf__force_multiselect_submission';
+
     /**
      * Definition
      *
@@ -46,86 +60,145 @@ class manage_lti_group_auto_enrol_form extends moodleform {
      */
     public function definition(): void {
         $this->auto_group_enrol_form();
+    }
+
+    /**
+     * Returns the element name of the group select of a tool.
+     *
+     * @param int $toolid
+     * @return string
+     */
+    public static function get_element_name(int $toolid): string {
+        return 'groups_' . $toolid;
+    }
+
+    /**
+     * Builds the form elements.
+     *
+     * @return void
+     */
+    public function auto_group_enrol_form(): void {
+        $mform = $this->_form;
+        $course = $this->_customdata['course'];
+        $tools = $this->_customdata['tools'];
+        $groups = $this->_customdata['groups'];
+        /** @var course_config $config */
+        $config = $this->_customdata['config'];
+
+        $mform->addElement('header', 'enrol', get_string('settings'));
+        $mform->setExpanded('enrol');
+
+        // Group(s) must be created first.
+        if (empty($groups)) {
+            $link = html_writer::link(
+                new moodle_url('/group/index.php', ['id' => $course->id]),
+                get_string('auto_group_enrol_form_no_group_found', 'tool_ltigroupautoenrol')
+            );
+            $mform->addElement('static', 'no_group_found', '', $link);
+            return;
+        }
+
+        $mform->addElement(
+            'advcheckbox',
+            'enable_enrol',
+            get_string('auto_group_form_enable_enrol', 'tool_ltigroupautoenrol')
+        );
+        $mform->addHelpButton('enable_enrol', 'auto_group_form_enable_enrol', 'tool_ltigroupautoenrol');
+        $mform->setDefault('enable_enrol', $config->enabled ? 1 : 0);
+
+        if (empty($tools)) {
+            $link = html_writer::link(
+                new moodle_url('/enrol/instances.php', ['id' => $course->id]),
+                get_string('auto_group_form_no_tools_link', 'tool_ltigroupautoenrol')
+            );
+            $mform->addElement(
+                'static',
+                'no_tools_found',
+                '',
+                get_string('auto_group_form_no_tools', 'tool_ltigroupautoenrol') . ' ' . $link
+            );
+            $this->add_action_buttons();
+            return;
+        }
+
+        $options = [];
+        foreach ($groups as $group) {
+            $options[$group->id] = format_string($group->name, true, ['context' => \context_course::instance($course->id)]);
+        }
+
+        $mform->addElement(
+            'static',
+            'groupslist_intro',
+            '',
+            get_string('auto_group_form_groupslist_intro', 'tool_ltigroupautoenrol')
+        );
+
+        foreach ($tools as $toolid => $tool) {
+            $label = get_string('form_groupsfortool', 'tool_ltigroupautoenrol', lti_resolver::get_tool_name($tool));
+            if ((int) $tool->status !== ENROL_INSTANCE_ENABLED) {
+                $label .= ' ' . get_string('auto_group_form_tool_disabled', 'tool_ltigroupautoenrol');
+            }
+            $name = self::get_element_name((int) $toolid);
+            $select = $mform->addElement('select', $name, $label, $options, ['size' => min(10, max(3, count($options)))]);
+            $select->setMultiple(true);
+            $mform->setType($name, PARAM_INT);
+            $mform->setDefault($name, $config->mapping->get_groupids((int) $toolid));
+        }
+
         $this->add_action_buttons();
     }
 
     /**
-     * Displays form
+     * Server-side validation against the allowlists of the current course.
      *
-     * @return void
-     * @throws \coding_exception
-     * @throws \dml_exception
+     * The select element silently drops unknown option values on export; this check inspects the
+     * raw submission so that manipulated ids are reported instead of being ignored.
+     *
+     * @param array $data
+     * @param array $files
+     * @return array Errors keyed by element name.
      */
-    public function auto_group_enrol_form(): void {
-        global $DB;
-        $mform = &$this->_form;
-        $course = $this->_customdata['course'];
-        $allgroupscourse = groups_get_all_groups($course->id);
-
-        $mform->addElement('header', 'enrol', get_string('settings'));
-
-        // Group(s) must be created first.
-        if (empty($allgroupscourse)) {
-            $groupurl = new moodle_url('/group/index.php', ['id' => $course->id]);
-            $link = html_writer::link(
-                $groupurl,
-                get_string('auto_group_enrol_form_no_group_found', 'tool_ltigroupautoenrol')
-            );
-            $mform->addElement('static', 'no_group_found', '', $link);
-
-            return;
+    public function validation($data, $files): array {
+        $errors = parent::validation($data, $files);
+        $groups = $this->_customdata['groups'];
+        foreach (array_keys($this->_customdata['tools']) as $toolid) {
+            $name = self::get_element_name((int) $toolid);
+            $raw = $this->_form->getSubmitValue($name);
+            // Core submits a placeholder (hidden input) for a multi-select with nothing selected;
+            // setType(PARAM_INT) cleans it to 0 before validation.
+            if ($raw === null || $raw === self::EMPTY_MULTISELECT || $raw === 0 || $raw === '0') {
+                continue;
+            }
+            if (!is_array($raw) || count($raw) > mapping::MAX_GROUPS_PER_TOOL) {
+                $errors[$name] = get_string('error_invalidgroups', 'tool_ltigroupautoenrol');
+                continue;
+            }
+            $raw = array_filter($raw, fn($value): bool => $value !== self::EMPTY_MULTISELECT);
+            foreach ($raw as $groupid) {
+                if (!is_scalar($groupid) || !ctype_digit((string) $groupid) || !isset($groups[(int) $groupid])) {
+                    $errors[$name] = get_string('error_invalidgroups', 'tool_ltigroupautoenrol');
+                    break;
+                }
+            }
         }
+        return $errors;
+    }
 
-        $instance = $DB->get_record('tool_ltigroupautoenrol', ['courseid' => $course->id]);
-        if (!$instance) {
-            $instance = new \stdClass();
-            $instance->courseid = $course->id;
-            $instance->enable_enrol = 0;
-            $instance->settings = json_encode([]);
+    /**
+     * Builds the mapping from validated form data, restricted to the allowlisted tools and groups.
+     *
+     * @param \stdClass $data Data returned by get_data().
+     * @return mapping
+     */
+    public function get_mapping(\stdClass $data): mapping {
+        $toolgroups = [];
+        foreach (array_keys($this->_customdata['tools']) as $toolid) {
+            $name = self::get_element_name((int) $toolid);
+            $toolgroups[(int) $toolid] = array_values(array_map('intval', (array) ($data->$name ?? [])));
         }
-
-        $mform->addElement(
-            'checkbox',
-            'enable_enrol',
-            get_string('auto_group_form_enable_enrol', 'tool_ltigroupautoenrol')
+        return (new mapping($toolgroups))->restrict_to(
+            array_keys($this->_customdata['tools']),
+            array_keys($this->_customdata['groups'])
         );
-        $mform->setDefault('enable_enrol', $instance->enable_enrol ?? 0);
-
-        $fields = [];
-        foreach ($allgroupscourse as $group) {
-            $fields[$group->id] = $group->name;
-        }
-
-        $ltitoolcount = \enrol_lti\helper::count_lti_tools([
-            'courseid' => $course->id,
-            'ltiversion' => 'LTI-1p3',
-            ]);
-
-        $ltitools = \enrol_lti\helper::get_lti_tools([
-            'courseid' => $course->id,
-            'ltiversion' => 'LTI-1p3',
-            ]);
-
-        $ltitoolgroup = json_decode($instance->settings, true);
-
-        $i = 0;
-        foreach ($ltitools as $toolid => $ltitool) {
-            $mform->addElement('hidden', 'ltitoolid_' . $i, $ltitool->id);
-            $mform->setType('ltitoolid_' . $i, PARAM_TEXT);
-
-            $select = $mform->addElement(
-                'select',
-                'groupslist_' . $i,
-                get_string('auto_group_form_groupslist', 'tool_ltigroupautoenrol') . $ltitool->name,
-                $fields
-            );
-            $select->setMultiple(true);
-            $mform->disabledIf('groupslist_' . $i, 'enable_enrol');
-            $mform->setDefault('groupslist_' . $i, $ltitoolgroup[$toolid] ?? []);
-
-            $i++;
-        }
-        $mform->addElement('hidden', 'ltitoolcount', $ltitoolcount);
-        $mform->setType('ltitoolcount', PARAM_TEXT);
     }
 }

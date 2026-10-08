@@ -1,1 +1,96 @@
+# Patch / merge / backup files
+*.orig
+*.bak
+*.rej
+
+# Windows zone identifier files
+*Zone.Identifier
+
+# macOS / Finder
 .DS_Store
+.Trashes
+.Spotlight-V100
+.fseventsd
+._*
+__MACOS
+
+# Windows / Explorer
+desktop.ini
+Thumbs.db
+$RECYCLE.BIN
+System Volume Information
+
+# Linux / Unix filesystem extras
+.directory
+.nfs*
+
+# Editor / IDE
+.idea/
+*.iml
+.vscode/
+
+# Vim / editor swap files
+*.swp
+*.swo
+*~
+
+# Logs / temp files
+*.log
+*.tmp
+tmp/
+temp/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# PHP / QA / test caches
+.phpunit.result.cache
+.php-cs-fixer.cache
+.phpstan.cache
+.psalm-cache/
+
+# Dependencies
+/vendor/
+node_modules/
+
+# Frontend build artifacts
+/dist/
+/build/
+/coverage/
+
+# Archives / packaged artifacts
+*.zip
+*.tar
+*.gz
+*.tgz
+*.7z
+
+# Test harness artefacts (the harnesses themselves are versioned)
+tests/playwright/playwright-report/
+tests/playwright/test-results/
+tests/playwright/blob-report/
+tests/load/apache-jmeter-*/
+tests/load/jmeter-report/
+tests/load/*.jtl
+tests/load/k6-summary.json
+tests/load/.load-env
+coverage.xml
+
+# moodle-plugin-ci working directories (when run from the plugin checkout)
+/ci/
+/moodle/
+/moodledata/
+
+# NVDA suite: installed dependencies and recorded evidence (#69).
+tests/a11y-nvda/node_modules/
+tests/a11y-nvda/playwright-report/
+tests/a11y-nvda/test-results/
+tests/a11y-nvda/transcripts/
+tests/a11y-nvda/nvda-results.json
+tests/playwright/transcripts/
+
+# Python byte code of the load-test helper
+__pycache__/
+*.py[cod]

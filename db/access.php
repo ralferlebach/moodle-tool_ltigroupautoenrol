@@ -15,7 +15,11 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * GDPR Provider
+ * Capabilities.
+ *
+ * tool/ltigroupautoenrol:manage controls the navigation link, the settings page (GET and POST)
+ * and the backfill. It is cloned from moodle/course:managegroups, because configuring the
+ * mapping effectively decides group memberships; existing role overrides are carried over.
  *
  * @package    tool_ltigroupautoenrol
  * @copyright  2026 Ralf Erlebach
@@ -23,22 +27,17 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-namespace tool_ltigroupautoenrol\privacy;
+defined('MOODLE_INTERNAL') || die();
 
-/**
- * Class provider
- *
- */
-class provider implements \core_privacy\local\metadata\null_provider {
-    /**
-     * Get the language string identifier with the component's language file to explain why this plugin stores no data.
-     *
-     * The identifier changed in 1.2 (formerly privacy:null_reason) because the text changed; the
-     * old community translations of the old text must not be shown for the new one.
-     *
-     * @return  string
-     */
-    public static function get_reason(): string {
-        return 'privacy:reason';
-    }
-}
+$capabilities = [
+    'tool/ltigroupautoenrol:manage' => [
+        'riskbitmask' => RISK_CONFIG,
+        'captype' => 'write',
+        'contextlevel' => CONTEXT_COURSE,
+        'archetypes' => [
+            'editingteacher' => CAP_ALLOW,
+            'manager' => CAP_ALLOW,
+        ],
+        'clonepermissionsfrom' => 'moodle/course:managegroups',
+    ],
+];

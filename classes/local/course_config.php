@@ -14,31 +14,41 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
+namespace tool_ltigroupautoenrol\local;
+
 /**
- * GDPR Provider
+ * Immutable plugin configuration of one course.
  *
  * @package    tool_ltigroupautoenrol
  * @copyright  2026 Ralf Erlebach
  * @author     Ralf Erlebach - https://github.com/ralferlebach
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-
-namespace tool_ltigroupautoenrol\privacy;
-
-/**
- * Class provider
- *
- */
-class provider implements \core_privacy\local\metadata\null_provider {
+final class course_config {
     /**
-     * Get the language string identifier with the component's language file to explain why this plugin stores no data.
+     * Constructor.
      *
-     * The identifier changed in 1.2 (formerly privacy:null_reason) because the text changed; the
-     * old community translations of the old text must not be shown for the new one.
-     *
-     * @return  string
+     * @param int $courseid Course id.
+     * @param bool $enabled Whether automatic group assignment is enabled for the course.
+     * @param mapping $mapping Tool to group mapping.
      */
-    public static function get_reason(): string {
-        return 'privacy:reason';
+    public function __construct(
+        /** @var int Course id. */
+        public readonly int $courseid,
+        /** @var bool Whether automatic group assignment is enabled. */
+        public readonly bool $enabled,
+        /** @var mapping Tool to group mapping. */
+        public readonly mapping $mapping
+    ) {
+    }
+
+    /**
+     * Returns the default configuration (disabled, empty mapping) for a course without stored settings.
+     *
+     * @param int $courseid
+     * @return self
+     */
+    public static function create_default(int $courseid): self {
+        return new self($courseid, false, new mapping([]));
     }
 }

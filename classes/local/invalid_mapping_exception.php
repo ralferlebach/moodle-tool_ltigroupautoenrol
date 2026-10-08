@@ -14,31 +14,25 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
+namespace tool_ltigroupautoenrol\local;
+
 /**
- * GDPR Provider
+ * Thrown when a stored or submitted tool to group mapping is structurally invalid.
+ *
+ * The debug info names the structural problem only; it never contains user data.
  *
  * @package    tool_ltigroupautoenrol
  * @copyright  2026 Ralf Erlebach
  * @author     Ralf Erlebach - https://github.com/ralferlebach
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-
-namespace tool_ltigroupautoenrol\privacy;
-
-/**
- * Class provider
- *
- */
-class provider implements \core_privacy\local\metadata\null_provider {
+class invalid_mapping_exception extends \moodle_exception {
     /**
-     * Get the language string identifier with the component's language file to explain why this plugin stores no data.
+     * Constructor.
      *
-     * The identifier changed in 1.2 (formerly privacy:null_reason) because the text changed; the
-     * old community translations of the old text must not be shown for the new one.
-     *
-     * @return  string
+     * @param string $debuginfo Description of the structural problem.
      */
-    public static function get_reason(): string {
-        return 'privacy:reason';
+    public function __construct(string $debuginfo) {
+        parent::__construct('error_invalidmapping', 'tool_ltigroupautoenrol', '', null, $debuginfo);
     }
 }

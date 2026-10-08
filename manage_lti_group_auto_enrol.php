@@ -15,9 +15,9 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Manage auto group enrolment
+ * Course settings page: enable the feature and map LTI 1.3 tools to groups.
  *
- * Params page for auto group enrollment as defined by Comete
+ * GET and POST require login to the course and tool/ltigroupautoenrol:manage (same as the navigation link).
  *
  * @package    tool_ltigroupautoenrol
  * @copyright  2026 Ralf Erlebach
@@ -25,68 +25,94 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-use enrol_lti\helper;
-require_once('../../../config.php');
+use tool_ltigroupautoenrol\form\manage_lti_group_auto_enrol_form;
+use tool_ltigroupautoenrol\local\access;
+use tool_ltigroupautoenrol\local\backfill_status;
+use tool_ltigroupautoenrol\local\config_repository;
+use tool_ltigroupautoenrol\local\course_config;
+use tool_ltigroupautoenrol\local\invalid_mapping_exception;
+use tool_ltigroupautoenrol\local\lti_resolver;
 
-defined('MOODLE_INTERNAL') || die;
+require_once(__DIR__ . '/../../../config.php');
 
 $courseid = required_param('id', PARAM_INT);
 $url = new moodle_url('/admin/tool/ltigroupautoenrol/manage_lti_group_auto_enrol.php', ['id' => $courseid]);
 $PAGE->set_url($url);
 
 $course = $DB->get_record('course', ['id' => $courseid], '*', MUST_EXIST);
-
 require_login($course);
-
-$coursecontext = context_course::instance($course->id);
-require_capability('moodle/course:update', $coursecontext);
+$coursecontext = access::require_manage($course);
 
 $PAGE->set_context($coursecontext);
 $PAGE->set_pagelayout('admin');
+$PAGE->set_title(get_string('auto_group_form_page_title', 'tool_ltigroupautoenrol'));
 $PAGE->set_heading($course->fullname);
 
-$form = new \tool_ltigroupautoenrol\form\manage_lti_group_auto_enrol_form($url, [
+$corrupt = false;
+try {
+    $config = config_repository::get_or_default($course->id);
+} catch (invalid_mapping_exception $e) {
+    // Show the page with an empty mapping; saving overwrites the corrupt record.
+    $corrupt = true;
+    $config = course_config::create_default($course->id);
+}
+
+// Server-side allowlists: only tools and groups of this course can be configured.
+$tools = lti_resolver::get_course_tools($course->id);
+$groups = groups_get_all_groups($course->id);
+
+$form = new manage_lti_group_auto_enrol_form($url, [
     'course' => $course,
+    'tools' => $tools,
+    'groups' => $groups,
+    'config' => $config,
 ]);
 
 if ($form->is_cancelled()) {
-    // Form is cancelled, return to course.
     redirect(new moodle_url('/course/view.php', ['id' => $course->id]));
 } else if ($data = $form->get_data()) {
-    // Form submitted, now get the data.
-
-    if (empty($data->enable_enrol)) {
-        $data->enable_enrol = 0;
-    }
-
-    $ltigroupautoenrol = new stdClass();
-    $ltigroupautoenrol->courseid = $course->id;
-    $ltigroupautoenrol->enable_enrol = $data->enable_enrol;
-
-    if (isset($data->ltitoolcount)) {
-        $ltitoolcourses = [];
-        for ($i = 0; $i < $data->ltitoolcount; $i++) {
-            if (isset($data->{"ltitoolid_" . $i}) && isset($data->{"groupslist_" . $i})) {
-                $ltitoolcourses[$data->{"ltitoolid_" . $i}] = $data->{"groupslist_" . $i};
-            }
-        }
-        $ltigroupautoenrol->settings = json_encode($ltitoolcourses);
-    }
-
-    $record = $DB->get_record('tool_ltigroupautoenrol', ['courseid' => $course->id], 'id');
-    if (!$record) {
-        $DB->insert_record('tool_ltigroupautoenrol', $ltigroupautoenrol);
-    } else {
-        $ltigroupautoenrol->id = $record->id;
-        $DB->update_record('tool_ltigroupautoenrol', $ltigroupautoenrol);
-    }
-
-    redirect(new moodle_url('/admin/tool/ltigroupautoenrol/manage_lti_group_auto_enrol.php', ['id' => $course->id]));
+    $mapping = $tools ? $form->get_mapping($data) : $config->mapping->restrict_to([], []);
+    config_repository::save(new course_config($course->id, !empty($data->enable_enrol), $mapping));
+    redirect($url, get_string('changessaved'), null, \core\output\notification::NOTIFY_SUCCESS);
 }
 
 echo $OUTPUT->header();
-
 echo $OUTPUT->heading(get_string('auto_group_form_page_title', 'tool_ltigroupautoenrol'));
 
-echo $form->render();
+$eventerrors = config_repository::get_event_errors($course->id);
+if ($eventerrors) {
+    $eventerrors->time = userdate($eventerrors->time);
+    echo $OUTPUT->notification(
+        get_string('event_errors', 'tool_ltigroupautoenrol', $eventerrors),
+        \core\output\notification::NOTIFY_WARNING
+    );
+}
+
+if ($corrupt) {
+    echo $OUTPUT->notification(
+        get_string('error_storedmappinginvalid', 'tool_ltigroupautoenrol'),
+        \core\output\notification::NOTIFY_ERROR
+    );
+}
+
+echo html_writer::tag('p', get_string('auto_group_form_intro', 'tool_ltigroupautoenrol'));
+
+$form->display();
+
+if ($config->enabled && !$config->mapping->is_empty()) {
+    echo $OUTPUT->box_start('generalbox', 'tool_ltigroupautoenrol_backfill');
+    echo $OUTPUT->heading(get_string('backfill_heading', 'tool_ltigroupautoenrol'), 3);
+    echo html_writer::tag('p', get_string('backfill_intro', 'tool_ltigroupautoenrol'));
+    $status = backfill_status::get_message($course->id);
+    if ($status) {
+        echo $OUTPUT->notification($status[0], $status[1], false);
+    }
+    echo $OUTPUT->single_button(
+        new moodle_url('/admin/tool/ltigroupautoenrol/backfill.php', ['id' => $course->id]),
+        get_string('backfill_preview', 'tool_ltigroupautoenrol'),
+        'get'
+    );
+    echo $OUTPUT->box_end();
+}
+
 echo $OUTPUT->footer();

@@ -1,0 +1,85 @@
+# Normalise line endings on all text files. Not cosmetic: CRLF shifts the boilerplate lines that
+# PHPCS counts and turns every file red (see docs/ENTWICKLUNGSUMGEBUNG.md, section 11).
+* text=auto eol=lf
+
+# Keep generated and source artefacts byte-stable across Linux/macOS/Windows.
+# Grunt/Rollup writes LF line endings in CI; pinning these files avoids false stale-build
+# failures caused by CRLF checkouts or editor rewrites.
+*.php      text eol=lf
+*.js       text eol=lf
+*.json     text eol=lf
+*.map      text eol=lf
+*.css      text eol=lf
+*.scss     text eol=lf
+*.mustache text eol=lf
+*.xml      text eol=lf
+*.jmx      text eol=lf
+*.yml      text eol=lf
+*.yaml     text eol=lf
+*.md       text eol=lf
+*.feature  text eol=lf
+*.txt      text eol=lf
+*.sh       text eol=lf
+*.py       text eol=lf
+*.svg      text eol=lf
+makefile   text eol=lf
+
+# Binary artefacts must never be line-ending normalised.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.webp  binary
+*.ico   binary
+*.zip   binary
+*.gz    binary
+*.tgz   binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.otf   binary
+*.eot   binary
+
+# ── Distribution rules for `git archive` (the release ZIP) ───────────────────
+# The released package contains everything Moodle runs, but none of the development, CI or
+# test-harness machinery. The release-artefact job in moodle-plugin-ci-main.yml enforces this.
+
+# Repository, IDE and CI plumbing.
+/.github                export-ignore
+/.idea                  export-ignore
+/.gitattributes         export-ignore
+/.editorconfig          export-ignore
+/.gitignore             export-ignore
+/.moodle-plugin-ci.yml  export-ignore
+/.eslintrc              export-ignore
+/.eslintignore          export-ignore
+/.stylelintrc           export-ignore
+/makefile               export-ignore
+/phpcs.xml              export-ignore
+/vendor                 export-ignore
+/node_modules           export-ignore
+
+# Internal documentation: session logs, prompts, specifications, environment setup.
+/docs/**                export-ignore
+# The change log ships: the README links to it, and a site administrator reading the plugin's
+# README after installing it should find the history there too.
+/docs/CHANGES.md        -export-ignore
+
+# Developer tooling.
+/tools                  export-ignore
+
+# Browser, load and JS unit-test harnesses. They seed sites, start servers and pull npm
+# packages: fine as developer/CI tools, out of place on a production Moodle server.
+/tests/load             export-ignore
+/tests/playwright       export-ignore
+/tests/upgrade          export-ignore
+/tests/concurrency      export-ignore
+/tests/release          export-ignore
+/tests/a11y-nvda        export-ignore
+/tests/jest             export-ignore
+
+# Only relevant when a repository is updated in place.
+/db/removed_files.txt   export-ignore
+
+# The Moodle-native tests (tests/unit, tests/behat, tests/coverage.php) DO ship: they are useful
+# to maintainers, plugin review and distribution QA.

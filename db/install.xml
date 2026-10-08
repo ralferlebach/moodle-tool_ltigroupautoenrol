@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<XMLDB PATH="admin/tool/ltigroupautoenrol/db" VERSION="20240404" COMMENT="XMLDB file for Moodle admin/tool/ltigroupautoenrol"
+<XMLDB PATH="admin/tool/ltigroupautoenrol/db" VERSION="20261008" COMMENT="XMLDB file for Moodle admin/tool/ltigroupautoenrol"
        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
        xsi:noNamespaceSchemaLocation="../../../../lib/xmldb/xmldb.xsd"
 >
@@ -10,9 +10,14 @@
         <FIELD NAME="courseid" TYPE="int" LENGTH="11" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Id of the course"/>
         <FIELD NAME="enable_enrol" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Active or not the plugin for each course"/>
         <FIELD NAME="settings" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="Groups as an indexed array with LTI tools as keys"/>
+        <FIELD NAME="backfill_time" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Time the last backfill run of the course finished"/>
+        <FIELD NAME="backfill_result" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="Counters of the last backfill run as JSON (no user data)"/>
+        <FIELD NAME="event_errors" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Group memberships of new enrolments that could not be added since event_errortime"/>
+        <FIELD NAME="event_errortime" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Time of the first unresolved failure of the enrolment observer"/>
       </FIELDS>
       <KEYS>
         <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="courseid" TYPE="foreign-unique" FIELDS="courseid" REFTABLE="course" REFFIELDS="id" COMMENT="At most one configuration per course"/>
       </KEYS>
     </TABLE>
   </TABLES>
