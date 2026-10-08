@@ -16,7 +16,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16
+        image: postgres:${{ matrix.pg }}
         env:
           POSTGRES_USER: 'postgres'
           POSTGRES_HOST_AUTH_METHOD: 'trust'
@@ -38,21 +38,21 @@ jobs:
       matrix:
         include:
           # Moodle 4.5 LTS (lower bound): PHP 8.1 - 8.3.
-          - {php: '8.1', moodle-branch: MOODLE_405_STABLE, database: pgsql, experimental: false}
-          - {php: '8.3', moodle-branch: MOODLE_405_STABLE, database: pgsql, experimental: false}
-          - {php: '8.3', moodle-branch: MOODLE_405_STABLE, database: mariadb, experimental: false}
+          - {php: '8.1', moodle-branch: MOODLE_405_STABLE, database: pgsql, pg: '16', experimental: false}
+          - {php: '8.3', moodle-branch: MOODLE_405_STABLE, database: pgsql, pg: '16', experimental: false}
+          - {php: '8.3', moodle-branch: MOODLE_405_STABLE, database: mariadb, pg: '16', experimental: false}
           # Moodle 5.0: PHP 8.2 - 8.4.
-          - {php: '8.4', moodle-branch: MOODLE_500_STABLE, database: pgsql, experimental: false}
-          - {php: '8.4', moodle-branch: MOODLE_500_STABLE, database: mariadb, experimental: false}
+          - {php: '8.4', moodle-branch: MOODLE_500_STABLE, database: pgsql, pg: '16', experimental: false}
+          - {php: '8.4', moodle-branch: MOODLE_500_STABLE, database: mariadb, pg: '16', experimental: false}
           # Moodle 5.1: PHP 8.2 - 8.4.
-          - {php: '8.4', moodle-branch: MOODLE_501_STABLE, database: pgsql, experimental: false}
-          - {php: '8.4', moodle-branch: MOODLE_501_STABLE, database: mariadb, experimental: false}
-          # Moodle 5.2 (upper bound): PHP 8.2 - 8.4.
-          - {php: '8.2', moodle-branch: MOODLE_502_STABLE, database: pgsql, experimental: false}
-          - {php: '8.4', moodle-branch: MOODLE_502_STABLE, database: pgsql, experimental: false}
-          - {php: '8.4', moodle-branch: MOODLE_502_STABLE, database: mariadb, experimental: false}
-          # Early warning only, not a supported version.
-          - {php: '8.4', moodle-branch: main, database: pgsql, experimental: true}
+          - {php: '8.4', moodle-branch: MOODLE_501_STABLE, database: pgsql, pg: '16', experimental: false}
+          - {php: '8.4', moodle-branch: MOODLE_501_STABLE, database: mariadb, pg: '16', experimental: false}
+          # Moodle 5.2 (upper bound): PHP 8.3 - 8.4 (composer requires php >= 8.3).
+          - {php: '8.3', moodle-branch: MOODLE_502_STABLE, database: pgsql, pg: '16', experimental: false}
+          - {php: '8.4', moodle-branch: MOODLE_502_STABLE, database: pgsql, pg: '16', experimental: false}
+          - {php: '8.4', moodle-branch: MOODLE_502_STABLE, database: mariadb, pg: '16', experimental: false}
+          # Early warning only, not a supported version; main requires PostgreSQL 17.
+          - {php: '8.4', moodle-branch: main, database: pgsql, pg: '17', experimental: true}
 
     steps:
       - name: Check out repository code
