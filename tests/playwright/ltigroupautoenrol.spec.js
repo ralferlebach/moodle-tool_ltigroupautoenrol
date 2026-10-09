@@ -103,10 +103,26 @@ async function expectNoHorizontalScroll(page, label) {
 }
 
 /**
- * Runs the queued adhoc tasks of the plugin, like cron would.
+ * Runs the queued backfill tasks of the plugin, like cron would.
+ *
+ * Only the plugin's task class: a fresh site also queues core tasks (some of them slow or reaching out to
+ * the network), and execFileSync blocks the test while they run.
  */
 function runAdhocTasks() {
-  execFileSync('php', [`${env('LTIGAE_MOODLE_DIR')}/admin/cli/adhoc_task.php`, '--execute'], { stdio: 'pipe' });
+  execFileSync('php', [
+    `${env('LTIGAE_MOODLE_DIR')}/admin/cli/adhoc_task.php`,
+    '--execute',
+    '--classname=\\tool_ltigroupautoenrol\\task\\backfill_task',
+  ], { stdio: 'pipe', timeout: 60000 });
+}
+
+/**
+ * Restores the seeded state of the backfill course, so every attempt (including retries) starts alike.
+ *
+ * @param {string} courseid
+ */
+function resetBackfillCourse(courseid) {
+  execFileSync('php', [`${__dirname}/reset_backfill.php`, courseid], { stdio: 'pipe', timeout: 60000 });
 }
 
 test.describe('tool_ltigroupautoenrol', () => {
@@ -166,6 +182,7 @@ test.describe('tool_ltigroupautoenrol', () => {
 
   test('backfill: preview, keyboard confirmation and status', async ({ page }) => {
     const courseid = env('LTIGAE_BACKFILL_COURSE');
+    resetBackfillCourse(courseid);
     await open(page, backfillUrl(courseid));
     await expect(page.locator('#region-main h2')).toHaveText('Assign existing LTI participants');
     const table = page.getByRole('table', { name: 'Preview per LTI tool' });

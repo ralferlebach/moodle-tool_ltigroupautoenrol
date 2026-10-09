@@ -27,6 +27,10 @@ Rollback: Moodle does not support downgrading a plugin. Restore the database bac
 
 # Changelog
 
+## 1.2 (2026100900)
+
+- Playwright CI (Moodle 5.3): the backfill test ran all adhoc tasks of the freshly installed site and exceeded its time limit on GitHub; it now runs only the plugin's backfill task. tests/playwright/reset_backfill.php restores the seeded backfill course before every attempt, so a retry no longer depends on the first attempt.
+
 ## 1.2 (2026100802)
 
 - Fix: the read-only pre-upgrade check `cli/check_upgrade.php` failed with "Class tool_ltigroupautoenrol\local\mapping not found" when run as documented, i.e. with the new code in place but before the upgrade (Moodle's class cache still describes the installed version, which had no classes/local). db/upgradelib.php now loads its classes explicitly; the upgrade itself is covered the same way.
