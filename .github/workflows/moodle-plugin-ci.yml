@@ -219,6 +219,9 @@ jobs:
     # Builds the installable ZIP exactly as "git archive" produces it and records its identity.
     needs: [test, upgrade-e2e]
     runs-on: ubuntu-22.04
+    outputs:
+      zip: ${{ steps.evidence.outputs.zip }}
+      sha256: ${{ steps.evidence.outputs.sha256 }}
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
@@ -235,7 +238,7 @@ jobs:
           unzip -Z1 "$ZIP" > contents.txt
           cat contents.txt
           # Development-only files must not be shipped.
-          if grep -E '^ltigroupautoenrol/(\.github/|\.gitattributes|\.gitignore|node_modules/|vendor/)|\.DS_Store' contents.txt; then
+          if grep -E '^ltigroupautoenrol/(\.github/|\.gitattributes|\.gitignore|node_modules/|vendor/|tests/playwright/|tests/upgrade/)|\.DS_Store' contents.txt; then
             echo "::error::Release ZIP contains development files"; exit 1
           fi
           for f in version.php LICENSE README.md docs/CHANGES.md db/install.xml db/access.php lang/en/tool_ltigroupautoenrol.php; do
@@ -243,8 +246,11 @@ jobs:
           done
 
       - name: Release evidence
+        id: evidence
         run: |
           sha256sum "$ZIP" | tee "$ZIP.sha256"
+          echo "zip=$ZIP" >> "$GITHUB_OUTPUT"
+          echo "sha256=$(cut -d' ' -f1 "$ZIP.sha256")" >> "$GITHUB_OUTPUT"
           {
             echo "### Release evidence"
             echo "- Commit: \`$GITHUB_SHA\`"
@@ -260,3 +266,48 @@ jobs:
           path: |
             ${{ env.ZIP }}
             ${{ env.ZIP }}.sha256
+
+  release-evidence:
+    # Collects the result of every job and matrix cell of this run, the Playwright run of the same commit
+    # and the identity of the release ZIP into one record (step summary and artifact), also when a job failed.
+    needs: [test, upgrade-e2e, release-package]
+    if: ${{ always() }}
+    runs-on: ubuntu-22.04
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Collect results per matrix cell
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ZIP: ${{ needs.release-package.outputs.zip }}
+          ZIPSHA: ${{ needs.release-package.outputs.sha256 }}
+        run: |
+          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT/jobs?per_page=100" \
+            --jq '.jobs[] | select(.name != "release-evidence") | "| \(.name) | \(.conclusion // .status) | [log](\(.html_url)) |"' \
+            | sort > cells.md
+          gh api "repos/$GITHUB_REPOSITORY/actions/workflows/playwright.yml/runs?head_sha=$GITHUB_SHA&per_page=1" \
+            --jq '.workflow_runs[0] | if . == null then "not found" else "\(.conclusion // .status): \(.html_url)" end' \
+            > playwright.txt || echo "not available" > playwright.txt
+          {
+            echo "## Release evidence tool_ltigroupautoenrol"
+            echo
+            echo "- Commit: \`$GITHUB_SHA\` ($GITHUB_REF_NAME)"
+            echo "- CI run: $run_url (attempt $GITHUB_RUN_ATTEMPT)"
+            echo "- Playwright run of this commit: $(cat playwright.txt)"
+            echo "- Release ZIP: \`${ZIP:-not built}\`"
+            echo "- SHA-256: \`${ZIPSHA:-not built}\`"
+            echo
+            echo "| Job / matrix cell | Result | Log |"
+            echo "|---|---|---|"
+            cat cells.md
+          } > release-evidence.md
+          cat release-evidence.md >> "$GITHUB_STEP_SUMMARY"
+          cat release-evidence.md
+
+      - name: Upload evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-evidence-${{ github.sha }}
+          path: release-evidence.md

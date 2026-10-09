@@ -27,6 +27,11 @@ Rollback: Moodle does not support downgrading a plugin. Restore the database bac
 
 # Changelog
 
+## 1.2 (2026100901)
+
+- CI release evidence (#7): the new job `release-evidence` runs after every CI run, also when jobs failed, and records the commit, the run, the result and log link of every job and matrix cell, the Playwright run of the same commit and name and SHA-256 of the release ZIP (step summary and artifact `release-evidence-<commit>`).
+- The release ZIP check also rejects tests/playwright and tests/upgrade (development tools, excluded via .gitattributes).
+
 ## 1.2 (2026100900)
 
 - Playwright CI (Moodle 5.3): the backfill test ran all adhoc tasks of the freshly installed site and exceeded its time limit on GitHub; it now runs only the plugin's backfill task. tests/playwright/reset_backfill.php restores the seeded backfill course before every attempt, so a retry no longer depends on the first attempt.
