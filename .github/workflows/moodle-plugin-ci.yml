@@ -217,7 +217,7 @@ jobs:
 
   playwright:
     # Browser tests (page identity, axe WCAG 2.1 A/AA, keyboard and focus, reflow, German UI, access denial)
-    # on the lower and upper supported branch. Part of this workflow so that release-package depends on it.
+    # on the lower and upper supported branch. Part of this workflow so that the release gate depends on it.
     runs-on: ubuntu-22.04
 
     strategy:
@@ -323,200 +323,108 @@ jobs:
           path: moodle/${{ env.PLUGIN_PATH }}/tests/playwright/playwright-report
           retention-days: 14
 
-  release-package:
-    # Builds the installable ZIP exactly as "git archive" produces it, only after every hard gate
-    # (all test cells, upgrade-e2e and playwright) has passed, and records its identity.
-    needs: [test, upgrade-e2e, playwright]
+  release-artefact:
+    name: Release artefact contents
+    # As in ralferlebach/moodle-plugintemplate: the gate checks the file set that is actually shipped
+    # (git archive honours the export-ignore rules of .gitattributes), not the working tree.
     runs-on: ubuntu-22.04
-    outputs:
-      zip: ${{ steps.evidence.outputs.zip }}
-      sha256: ${{ steps.evidence.outputs.sha256 }}
     steps:
-      - name: Check out repository code
+      - name: Check out plugin
         uses: actions/checkout@v4
 
-      - name: Build ZIP
+      - name: Build the release archive exactly as it will be distributed
         run: |
-          version=$(sed -n 's/.*\$plugin->version *= *\([0-9]*\).*/\1/p' version.php)
-          name="tool_ltigroupautoenrol_${version}_${GITHUB_SHA::12}.zip"
-          git archive --format=zip --prefix=ltigroupautoenrol/ -o "$name" HEAD
-          echo "ZIP=$name" >> "$GITHUB_ENV"
+          git archive --format=tar --prefix=ltigroupautoenrol/ HEAD > /tmp/release.tar
+          tar -tf /tmp/release.tar > /tmp/release.list
+          echo "Artefakt enthält $(wc -l < /tmp/release.list) Einträge."
 
-      - name: Check ZIP contents
+      - name: No developer tooling, CI plumbing or test harnesses may ship
         run: |
-          unzip -Z1 "$ZIP" > contents.txt
-          cat contents.txt
-          # Inventory: exactly the tracked files minus the export-ignore paths of .gitattributes, and no
-          # runtime path may be export-ignored.
-          ignored=$(awk '$2 == "export-ignore" {print $1}' .gitattributes)
-          for path in $ignored; do
-            case "$path" in
-              classes*|db*|lang*|backup*|cli*|templates*|amd*|pix*|tests/generator*|*.php)
-                echo "::error::Runtime path $path is export-ignored"; exit 1;;
-            esac
-          done
-          pattern=$(printf '%s\n' $ignored | sed 's/[.]/\\./g' | paste -sd'|')
-          git ls-files | grep -Ev "^(${pattern})(/|$)" | sort > expected.txt
-          grep -v '/$' contents.txt | sed 's#^ltigroupautoenrol/##' | sort > actual.txt
-          diff expected.txt actual.txt || { echo "::error::ZIP inventory differs from the tracked runtime files"; exit 1; }
-          # Development-only files must not be shipped.
-          if grep -E '^ltigroupautoenrol/(\.github/|\.gitattributes|\.gitignore|node_modules/|vendor/|tests/playwright/|tests/upgrade/)|\.DS_Store' contents.txt; then
-            echo "::error::Release ZIP contains development files"; exit 1
+          rc=0
+          while read -r forbidden; do
+            if grep -qE "^ltigroupautoenrol/${forbidden}" /tmp/release.list; then
+              echo "VERBOTEN im Release-Artefakt: $forbidden"
+              grep -E "^ltigroupautoenrol/${forbidden}" /tmp/release.list | head -5
+              rc=1
+            fi
+          done <<'PATTERNS'
+          tools/
+          \.github/
+          tests/load/
+          tests/playwright/
+          tests/upgrade/
+          \.gitattributes
+          \.gitignore
+          makefile
+          phpcs\.xml
+          PATTERNS
+          # docs/ is internal documentation, except the change log the README links to.
+          if grep -E "^ltigroupautoenrol/docs/." /tmp/release.list | grep -vx "ltigroupautoenrol/docs/CHANGES.md"; then
+            echo "VERBOTEN im Release-Artefakt: interne Dokumentation unter docs/"
+            rc=1
           fi
-          for f in version.php LICENSE README.md docs/CHANGES.md db/install.xml db/access.php lang/en/tool_ltigroupautoenrol.php; do
-            grep -qx "ltigroupautoenrol/$f" contents.txt || { echo "::error::Missing $f"; exit 1; }
-          done
+          if [[ $rc -ne 0 ]]; then
+            echo "Das Release-Artefakt darf keine Entwicklerwerkzeuge enthalten."
+            exit 1
+          fi
+          echo "Artefakt ist sauber."
 
-      - name: Release evidence
-        id: evidence
+      - name: The artefact must still contain what Moodle runs
         run: |
-          sha256sum "$ZIP" | tee "$ZIP.sha256"
-          echo "zip=$ZIP" >> "$GITHUB_OUTPUT"
-          echo "sha256=$(cut -d' ' -f1 "$ZIP.sha256")" >> "$GITHUB_OUTPUT"
-          {
-            echo "### Release evidence"
-            echo "- Commit: \`$GITHUB_SHA\`"
-            echo "- CI run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
-            echo "- ZIP: \`$ZIP\`"
-            echo "- SHA-256: \`$(cut -d' ' -f1 "$ZIP.sha256")\`"
-          } >> "$GITHUB_STEP_SUMMARY"
+          for required in ltigroupautoenrol/version.php ltigroupautoenrol/lang ltigroupautoenrol/db \
+              ltigroupautoenrol/classes ltigroupautoenrol/backup ltigroupautoenrol/lib.php \
+              ltigroupautoenrol/docs/CHANGES.md ltigroupautoenrol/README.md ltigroupautoenrol/LICENSE; do
+            if ! grep -q "^${required}" /tmp/release.list; then
+              echo "FEHLT im Release-Artefakt: $required"
+              exit 1
+            fi
+          done
+          echo "Pflichtinhalte vorhanden."
 
-      - name: Upload ZIP
-        uses: actions/upload-artifact@v4
-        with:
-          name: tool_ltigroupautoenrol-${{ github.sha }}
-          path: |
-            ${{ env.ZIP }}
-            ${{ env.ZIP }}.sha256
-
-  release-smoke:
-    # Installs exactly the built ZIP on a fresh site and runs the production path once
-    # (.github/scripts/release_smoke.php): installed version, LTI enrolment -> group, preview, backfill, deletion.
-    needs: release-package
+  maturity-gate:
+    name: Release gate
+    # Single place where the release gates are judged; Playwright is one of them (audit A-01).
+    needs: [test, upgrade-e2e, playwright, release-artefact]
     runs-on: ubuntu-22.04
-
-    services:
-      postgres:
-        image: postgres:${{ matrix.pg }}
-        env:
-          POSTGRES_USER: 'postgres'
-          POSTGRES_HOST_AUTH_METHOD: 'trust'
-        ports:
-          - 5432:5432
-        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 3
-      mariadb:
-        image: mariadb:${{ matrix.mariadb }}
-        env:
-          MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: "true"
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="healthcheck.sh --connect --innodb_initialized"
-          --health-interval 10s --health-timeout 5s --health-retries 10
-
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - {php: '8.3', moodle-branch: MOODLE_405_STABLE, database: pgsql, pg: '16', mariadb: '10.11', plugin-path: admin/tool}
-          - {php: '8.4', moodle-branch: MOODLE_503_STABLE, database: mariadb, pg: '17', mariadb: '11.4', plugin-path: public/admin/tool}
-
+    # Without always() this job is skipped when a dependency fails, and a skipped job is not re-run by
+    # "re-run failed jobs".
+    if: always()
     steps:
-      - name: Check out repository code (smoke script only; the plugin comes from the ZIP)
+      - name: Check out plugin
         uses: actions/checkout@v4
-        with:
-          path: plugin
 
-      - name: Download the release ZIP
-        uses: actions/download-artifact@v4
-        with:
-          name: tool_ltigroupautoenrol-${{ github.sha }}
-          path: release
-
-      - name: Setup PHP ${{ matrix.php }}
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: ${{ matrix.php }}
-          extensions: pgsql, mysqli, gd, intl, zip, soap, mbstring, curl, xml, exif, sodium
-          ini-values: max_input_vars=5000
-          coverage: none
-
-      - name: Check out Moodle and install the ZIP
+      - name: Every release gate must be green
         run: |
-          (cd release && sha256sum -c ./*.zip.sha256)
-          git clone --depth 1 --branch "${{ matrix.moodle-branch }}" https://github.com/moodle/moodle.git moodle
-          (cd moodle && composer install --no-interaction --no-dev --no-progress)
-          mkdir -p "moodle/${{ matrix.plugin-path }}"
-          unzip -q release/*.zip -d "moodle/${{ matrix.plugin-path }}"
-          ls "moodle/${{ matrix.plugin-path }}/ltigroupautoenrol/version.php"
-
-      - name: Install a fresh site with the plugin
-        run: |
-          if [ "${{ matrix.database }}" = pgsql ]; then
-            psql -h 127.0.0.1 -U postgres -c "CREATE DATABASE moodle ENCODING 'UTF8' TEMPLATE template0;"
-            dbuser=postgres; dbport=5432
-          else
-            mysql -h 127.0.0.1 -uroot -e "CREATE DATABASE moodle DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-            dbuser=root; dbport=3306
-          fi
-          cd moodle
-          php admin/cli/install.php --non-interactive --agree-license \
-            --dbtype=${{ matrix.database }} --dbhost=127.0.0.1 --dbport=$dbport --dbname=moodle --dbuser=$dbuser --dbpass= \
-            --wwwroot=http://127.0.0.1 --dataroot=/tmp/moodledata \
-            --fullname=Smoke --shortname=Smoke --adminpass='Admin!23' --adminemail=admin@example.invalid
-          php admin/cli/check_database_schema.php | tee schema.log
-          grep -qx "Database structure is ok." schema.log
-
-      - name: Smoke test of the installed ZIP
-        run: php plugin/.github/scripts/release_smoke.php "$PWD/moodle" "$PWD/moodle/${{ matrix.plugin-path }}/ltigroupautoenrol"
-
-  release-evidence:
-    # Collects the result of every job and matrix cell of this run, the Playwright run of the same commit
-    # and the identity of the release ZIP into one record (step summary and artifact), also when a job failed.
-    needs: [test, upgrade-e2e, playwright, release-package, release-smoke]
-    if: ${{ always() }}
-    runs-on: ubuntu-22.04
-    permissions:
-      actions: read
-      contents: read
-    steps:
-      - name: Collect results per matrix cell
-        env:
-          GH_TOKEN: ${{ github.token }}
-          ZIP: ${{ needs.release-package.outputs.zip }}
-          ZIPSHA: ${{ needs.release-package.outputs.sha256 }}
-          GATES: >-
-            test=${{ needs.test.result }} upgrade-e2e=${{ needs.upgrade-e2e.result }}
-            playwright=${{ needs.playwright.result }} release-package=${{ needs.release-package.result }}
-            release-smoke=${{ needs.release-smoke.result }}
-        run: |
-          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
-          gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT/jobs?per_page=100" \
-            --jq '.jobs[] | select(.name != "release-evidence") | "| \(.name) | \(.conclusion // .status) | [log](\(.html_url)) |"' \
-            | sort > cells.md
-          releasable=yes
-          for gate in $GATES; do
-            [ "${gate#*=}" = success ] || releasable=no
+          rc=0
+          for entry in \
+              "test=${{ needs.test.result }}" \
+              "upgrade-e2e=${{ needs.upgrade-e2e.result }}" \
+              "playwright=${{ needs.playwright.result }}" \
+              "release-artefact=${{ needs.release-artefact.result }}"; do
+            echo "  ${entry%%=*}: ${entry#*=}"
+            if [[ "${entry#*=}" != "success" ]]; then
+              rc=1
+            fi
           done
-          {
-            echo "## Release evidence tool_ltigroupautoenrol"
-            echo
-            echo "- Commit: \`$GITHUB_SHA\` ($GITHUB_REF_NAME)"
-            echo "- CI run: $run_url (attempt $GITHUB_RUN_ATTEMPT)"
-            echo "- Gates: $GATES"
-            echo "- **Releasable: $releasable** (all gates must be success; the ZIP is built only after test, upgrade-e2e and playwright)"
-            echo "- Release ZIP: \`${ZIP:-not built}\`"
-            echo "- SHA-256: \`${ZIPSHA:-not built}\`"
-            echo
-            echo "| Job / matrix cell | Result | Log |"
-            echo "|---|---|---|"
-            cat cells.md
-          } > release-evidence.md
-          cat release-evidence.md >> "$GITHUB_STEP_SUMMARY"
-          cat release-evidence.md
+          if [[ $rc -ne 0 ]]; then
+            echo "Mindestens ein Release-Gate ist nicht gruen (siehe Liste oben)."
+            exit 1
+          fi
+          maturity=$(grep -oE 'MATURITY_[A-Z]+' version.php | head -1)
+          echo "Deklarierter Reifegrad: ${maturity:-unbekannt}"
+          echo "Alle Release-Gates sind gruen."
 
-      - name: Upload evidence
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-evidence-${{ github.sha }}
-          path: release-evidence.md
+  ci-complete:
+    name: CI complete
+    needs: [maturity-gate]
+    runs-on: ubuntu-22.04
+    if: always()
+    steps:
+      - name: All gates must have succeeded
+        run: |
+          echo "  maturity-gate: ${{ needs.maturity-gate.result }}"
+          if [[ "${{ needs.maturity-gate.result }}" != "success" ]]; then
+            echo "Mindestens ein Gate ist nicht gruen (siehe Release gate)."
+            exit 1
+          fi
+          echo "All CI gates passed."

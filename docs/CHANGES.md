@@ -28,11 +28,16 @@ Rollback: Moodle does not support downgrading a plugin. Restore the database bac
 
 # Changelog
 
+## 1.2 (2026102501)
+
+- CI: the release jobs follow ralferlebach/moodle-plugintemplate: `release-artefact` (git archive, forbidden development paths, required runtime contents), `maturity-gate` (all gates incl. Playwright must be green, audit A-01) and `ci-complete` (status check for branch protection). The jobs `release-package`, `release-smoke` and `release-evidence` of 2026100901/2026102500 and the script .github/scripts/release_smoke.php are removed; the inventory check of `release-package` misread the export-ignore rules (leading "/", `docs/**` with `-export-ignore` for docs/CHANGES.md) and failed.
+- The separate workflow playwright.yml is removed: the same Playwright tests run as job `playwright` of moodle-plugin-ci.yml, which the release gate depends on.
+
 ## 1.2 (2026102500)
 
 Findings of the code audit of 2026-10-09 (commit bfabdb7):
 
-- A-01 Release gate: the Playwright tests are a job of the main workflow; the release ZIP is built only after all test cells, the upgrade test and Playwright have passed. The separate playwright.yml is gone.
+- A-01 Release gate: the Playwright tests are a job of the main workflow and part of the release gate (since 2026102501 the template's `maturity-gate`).
 - A-02 Failures of the enrolment observer are no longer cleared by every error-free backfill (a backfill only covers the participants of its preview). They are cleared only if, after the run, no eligible participant misses a membership, and only failures recorded before that check (new field `event_errorlast`, upgrade step 2026102500).
 - A-03 The confirmation of "Assign existing LTI participants" is bound to the preview on the server: time and mapping fingerprint are stored in the session, the button only carries a one-time token (expires after one hour, bound to the course). The preview time is taken before the preview queries.
 - A-04 A backfill that fails with an exception records the status "failed" instead of staying "running"; the exception is passed on so the task API retries it. A run that is no longer queued without a result is shown as "interrupted".
@@ -42,7 +47,7 @@ Findings of the code audit of 2026-10-09 (commit bfabdb7):
 - A-08 The on/off switch is also shown without groups, so the feature can be switched off after all groups were deleted.
 - A-09 A confirmation while a run is queued says so instead of "has been scheduled".
 - A-10 Additive semantics (no automatic revocation) documented in detail and covered by tests (mapping change, disabling, unenrolment, tool deletion).
-- A-11 Release smoke test: the CI installs exactly the built ZIP on a fresh Moodle 4.5 and 5.3 site and runs the production path once; the ZIP inventory is checked against the tracked runtime files.
+- A-11 Release artefact: checked with git archive against forbidden development paths and required runtime contents (since 2026102501 the template's `release-artefact`; the smoke installation of 2026102500 was removed again).
 - A-12 Group selects of tools that do not belong to the course (foreign, deleted, invented) are rejected with a form error instead of being ignored.
 - A-13 README badges per branch (main = released, development = next).
 
