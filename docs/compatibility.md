@@ -19,5 +19,5 @@ fields.
 
 The CI matrix runs the PHPUnit, Behat and upgrade tests on all five versions (see
 .github/workflows/moodle-plugin-ci.yml); the Playwright browser tests run on Moodle 4.5 and
-5.3 (.github/workflows/playwright.yml). Moodle 5.3 requires PHP 8.3 or later, PostgreSQL 17 or later and
+5.3 in the same workflow (job playwright), so the release ZIP depends on them. Moodle 5.3 requires PHP 8.3 or later, PostgreSQL 17 or later and
 MariaDB 11.4 or later; the CI uses exactly these minimums for the 5.3 cells.

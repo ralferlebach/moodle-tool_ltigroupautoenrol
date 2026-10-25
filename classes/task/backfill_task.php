@@ -59,12 +59,14 @@ class backfill_task extends \core\task\adhoc_task {
      * @return bool
      */
     public static function is_pending(int $courseid): bool {
-        foreach (\core\task\manager::get_adhoc_tasks(self::class) as $task) {
-            if ((int) ($task->get_custom_data()->courseid ?? 0) === $courseid) {
-                return true;
-            }
-        }
-        return false;
+        global $DB;
+        // Filtered in the database: the custom data is the JSON written by create(), starting with the course id.
+        // Loading all queued tasks of the class would make this per-course check cost site-wide.
+        return $DB->record_exists_select(
+            'task_adhoc',
+            'classname = :classname AND ' . $DB->sql_like('customdata', ':customdata'),
+            ['classname' => '\\' . self::class, 'customdata' => '{"courseid":' . $courseid . ',%']
+        );
     }
 
     /**
@@ -114,8 +116,24 @@ class backfill_task extends \core\task\adhoc_task {
                 return;
             }
             config_repository::record_backfill_status($courseid, config_repository::BACKFILL_RUNNING);
-            $result = $this->run_backfill($config, $previewtime);
-            config_repository::record_backfill($courseid, $result);
+            try {
+                $result = $this->run_backfill($config, $previewtime);
+                config_repository::record_backfill($courseid, $result);
+                if ($result->errors === 0) {
+                    // The run covers the set approved in the preview only. Failures of the enrolment observer are
+                    // cleared only if no currently eligible participant misses a membership, and only those
+                    // recorded before this check.
+                    $checktime = time();
+                    if (assignment_service::count_missing($config, $checktime) === 0) {
+                        config_repository::clear_event_errors($courseid, $checktime);
+                    }
+                }
+            } catch (\Throwable $e) {
+                // Never leave "running" behind: the status shows the failure, the task API retries the task.
+                config_repository::record_backfill_status($courseid, config_repository::BACKFILL_FAILED);
+                mtrace("tool_ltigroupautoenrol: backfill course {$courseid} failed: " . get_class($e));
+                throw $e;
+            }
             mtrace("tool_ltigroupautoenrol: backfill course {$courseid}: " . json_encode($result->to_array()));
             if ($result->errors > 0) {
                 throw new \moodle_exception('error_backfillpartial', 'tool_ltigroupautoenrol', '', $result->errors);

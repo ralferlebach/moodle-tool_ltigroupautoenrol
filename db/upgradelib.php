@@ -281,6 +281,7 @@ function tool_ltigroupautoenrol_upgrade_add_backfill_status(): array {
         new xmldb_field('backfill_result', XMLDB_TYPE_TEXT, null, null, null, null, null, 'backfill_time'),
         new xmldb_field('event_errors', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0', 'backfill_result'),
         new xmldb_field('event_errortime', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0', 'event_errors'),
+        new xmldb_field('event_errorlast', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0', 'event_errortime'),
     ];
     foreach ($fields as $field) {
         if (!$dbman->field_exists($table, $field)) {

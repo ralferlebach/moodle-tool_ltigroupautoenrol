@@ -23,8 +23,8 @@ use tool_ltigroupautoenrol\local\config_repository;
  *
  * The plugin table is recreated from the original install.xml of each supported baseline
  * (tests/fixtures/install_<version>.xml, taken unchanged from the git history: 0.1 = 2024050100,
- * the published 1.0.1 = 2024100600, 1.1 = 2026030700 and the pre-release
- * state of 2026100800 from pull request #11 = 2026100800_pr11), filled with data in the format that
+ * the published 1.0.1 = 2024100600, 1.1 = 2026030700, the pre-release state of 2026100800 from
+ * pull request #11 = 2026100800_pr11 and 1.2 as of 2026100901), filled with data in the format that
  * version wrote, and upgraded with the real upgrade function. The result must equal a fresh install
  * (install.xml), keep every mapping and back up everything it removes. tearDown() recreates the
  * current table, so other tests always see the current schema.
@@ -119,7 +119,7 @@ final class upgradelib_test extends \advanced_testcase {
         } finally {
             $output = ob_get_clean();
         }
-        $this->assertEquals(2026100801, get_config('tool_ltigroupautoenrol', 'version'));
+        $this->assertEquals(2026102500, get_config('tool_ltigroupautoenrol', 'version'));
         return $output;
     }
 
@@ -274,7 +274,7 @@ final class upgradelib_test extends \advanced_testcase {
 
         $output = $this->upgrade_from(2026100800);
 
-        foreach (['backfill_time', 'backfill_result', 'event_errors', 'event_errortime'] as $field) {
+        foreach (['backfill_time', 'backfill_result', 'event_errors', 'event_errortime', 'event_errorlast'] as $field) {
             $this->assertStringContainsString("Added field \"{$field}\".", $output);
         }
         $this->assert_schema_matches_install_xml();
@@ -285,6 +285,29 @@ final class upgradelib_test extends \advanced_testcase {
 
         // A site already on the final 2026100800 schema is not touched by the new step.
         $this->assertSame('', $this->upgrade_from(2026100800));
+    }
+
+    /**
+     * Upgrade from 2026100901: the time of the last observer failure is added, unresolved failures are kept.
+     */
+    public function test_upgrade_from_2026100901(): void {
+        global $DB;
+        $this->recreate_table(__DIR__ . '/fixtures/install_2026100901.xml');
+        $course = $this->getDataGenerator()->create_course();
+        $DB->insert_record('tool_ltigroupautoenrol', (object) [
+            'courseid' => $course->id,
+            'enable_enrol' => 1,
+            'settings' => '{"7":[3]}',
+            'event_errors' => 2,
+            'event_errortime' => 1000,
+        ]);
+
+        $output = $this->upgrade_from(2026100901);
+
+        $this->assertStringContainsString('Added field "event_errorlast".', $output);
+        $this->assert_schema_matches_install_xml();
+        $record = $DB->get_record('tool_ltigroupautoenrol', ['courseid' => $course->id], '*', MUST_EXIST);
+        $this->assertEquals([2, 1000, 0], [$record->event_errors, $record->event_errortime, $record->event_errorlast]);
     }
 
     /**

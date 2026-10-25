@@ -135,31 +135,55 @@ final class assignment_service {
             }
             $tool = $tools[$toolid];
             [$eligiblesql, $params] = lti_resolver::get_eligible_users_sql($tool, $now);
-            $groups = [];
-            $missing = 0;
-            foreach ($config->mapping->get_groupids($toolid) as $groupid) {
-                if (!isset($coursegroups[$groupid])) {
-                    continue;
-                }
-                $groups[$groupid] = $coursegroups[$groupid];
-                $missing += $DB->count_records_sql(
-                    "SELECT COUNT(1)
-                       FROM ($eligiblesql) eligible
-                      WHERE NOT EXISTS (
-                            SELECT 1 FROM {groups_members} gm
-                             WHERE gm.groupid = :groupid AND gm.userid = eligible.userid)",
-                    $params + ['groupid' => $groupid]
-                );
-            }
+            $groups = array_intersect_key($coursegroups, array_flip($config->mapping->get_groupids($toolid)));
             $rows[$toolid] = (object) [
                 'tool' => $tool,
                 'name' => lti_resolver::get_tool_name($tool),
                 'groups' => $groups,
                 'eligible' => $DB->count_records_sql("SELECT COUNT(1) FROM ($eligiblesql) eligible", $params),
-                'missing' => $missing,
+                'missing' => self::count_missing_memberships($config->courseid, array_keys($groups), $eligiblesql, $params),
             ];
         }
         return $rows;
+    }
+
+    /**
+     * Counts the memberships the plugin would currently add in a course (all mapped tools, all eligible users).
+     *
+     * Zero means that every currently eligible LTI participant is a member of all groups mapped to their tool.
+     *
+     * @param course_config $config
+     * @param int|null $now
+     * @return int
+     */
+    public static function count_missing(course_config $config, ?int $now = null): int {
+        return array_sum(array_column(self::preview($config, $now), 'missing'));
+    }
+
+    /**
+     * Counts missing memberships of eligible users in a set of groups with one query, whatever the number of groups.
+     *
+     * @param int $courseid
+     * @param int[] $groupids Existing groups of the course.
+     * @param string $eligiblesql Subquery returning the column "userid".
+     * @param array $params Parameters of the subquery.
+     * @return int
+     */
+    private static function count_missing_memberships(int $courseid, array $groupids, string $eligiblesql, array $params): int {
+        global $DB;
+        if (!$groupids) {
+            return 0;
+        }
+        [$insql, $inparams] = $DB->get_in_or_equal($groupids, SQL_PARAMS_NAMED, 'ltigrp');
+        return $DB->count_records_sql(
+            "SELECT COUNT(1)
+               FROM ($eligiblesql) eligible
+               JOIN {groups} g ON g.courseid = :ltigrpcourseid AND g.id $insql
+              WHERE NOT EXISTS (
+                    SELECT 1 FROM {groups_members} gm
+                     WHERE gm.groupid = g.id AND gm.userid = eligible.userid)",
+            $params + $inparams + ['ltigrpcourseid' => $courseid]
+        );
     }
 
     /**

@@ -143,6 +143,9 @@ final class config_repository {
     /** @var string Backfill status: not executed because the configuration changed or was disabled. */
     public const BACKFILL_SKIPPED = 'skipped';
 
+    /** @var string Backfill status: the run failed with an exception; the task API retries it. */
+    public const BACKFILL_FAILED = 'failed';
+
     /**
      * Records the status of the backfill of a course (status, time, counters; no user data).
      *
@@ -180,15 +183,28 @@ final class config_repository {
      * @return void
      */
     public static function record_backfill(int $courseid, assignment_result $result, ?int $time = null): void {
-        global $DB;
         self::record_backfill_status($courseid, self::BACKFILL_DONE, $result, $time);
-        if ($result->errors === 0) {
-            // A complete backfill has assigned every eligible participant, including those the observer missed.
-            $DB->execute(
-                'UPDATE {' . self::TABLE . '} SET event_errors = 0, event_errortime = 0 WHERE courseid = ?',
-                [$courseid]
-            );
-        }
+    }
+
+    /**
+     * Clears the unresolved failures of the enrolment observer that happened before a check time.
+     *
+     * Call only after verifying at $checktime that no eligible participant misses a membership
+     * ({@see assignment_service::count_missing()}). Failures recorded at or after $checktime are kept,
+     * so a failure that happens while the check runs is never cleared.
+     *
+     * @param int $courseid
+     * @param int $checktime Time taken before the check.
+     * @return void
+     */
+    public static function clear_event_errors(int $courseid, int $checktime): void {
+        global $DB;
+        $DB->execute(
+            'UPDATE {' . self::TABLE . '}
+                SET event_errors = 0, event_errortime = 0, event_errorlast = 0
+              WHERE courseid = ? AND event_errors > 0 AND event_errorlast < ?',
+            [$courseid, $checktime]
+        );
     }
 
     /**
@@ -204,12 +220,14 @@ final class config_repository {
         if ($count <= 0) {
             return;
         }
+        $time = $time ?? time();
         $DB->execute(
             'UPDATE {' . self::TABLE . '}
                 SET event_errors = event_errors + ?,
-                    event_errortime = CASE WHEN event_errortime = 0 THEN ? ELSE event_errortime END
+                    event_errortime = CASE WHEN event_errortime = 0 THEN ? ELSE event_errortime END,
+                    event_errorlast = CASE WHEN event_errorlast > ? THEN event_errorlast ELSE ? END
               WHERE courseid = ?',
-            [$count, $time ?? time(), $courseid]
+            [$count, $time, $time, $time, $courseid]
         );
     }
 
@@ -246,7 +264,9 @@ final class config_repository {
         foreach (array_keys($counters->to_array()) as $key) {
             $counters->$key = (int) ($data[$key] ?? 0);
         }
-        $statuses = [self::BACKFILL_QUEUED, self::BACKFILL_RUNNING, self::BACKFILL_DONE, self::BACKFILL_SKIPPED];
+        $statuses = [
+            self::BACKFILL_QUEUED, self::BACKFILL_RUNNING, self::BACKFILL_DONE, self::BACKFILL_SKIPPED, self::BACKFILL_FAILED,
+        ];
         $status = in_array($data['status'] ?? null, $statuses, true) ? $data['status'] : self::BACKFILL_DONE;
         return (object) (['status' => $status, 'time' => (int) $record->backfill_time] + $counters->to_array());
     }

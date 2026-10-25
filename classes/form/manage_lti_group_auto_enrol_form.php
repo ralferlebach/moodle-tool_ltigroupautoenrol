@@ -47,7 +47,8 @@ require_once("$CFG->libdir/formslib.php");
  * - config (course_config): the stored configuration.
  *
  * The form contains one multi-select per allowlisted tool, named groups_<toolid>. It has no
- * hidden tool ids or counters, so a submission can only address tools of the current course.
+ * hidden tool ids or counters; a submitted select of any other tool is rejected by validation().
+ * The enable switch is always present, also without groups or tools, so the feature can be switched off.
  */
 class manage_lti_group_auto_enrol_form extends moodleform {
     /** @var string Value core submits for a multi-select without selection. */
@@ -88,16 +89,6 @@ class manage_lti_group_auto_enrol_form extends moodleform {
         $mform->addElement('header', 'enrol', get_string('settings'));
         $mform->setExpanded('enrol');
 
-        // Group(s) must be created first.
-        if (empty($groups)) {
-            $link = html_writer::link(
-                new moodle_url('/group/index.php', ['id' => $course->id]),
-                get_string('auto_group_enrol_form_no_group_found', 'tool_ltigroupautoenrol')
-            );
-            $mform->addElement('static', 'no_group_found', '', $link);
-            return;
-        }
-
         $mform->addElement(
             'advcheckbox',
             'enable_enrol',
@@ -105,6 +96,17 @@ class manage_lti_group_auto_enrol_form extends moodleform {
         );
         $mform->addHelpButton('enable_enrol', 'auto_group_form_enable_enrol', 'tool_ltigroupautoenrol');
         $mform->setDefault('enable_enrol', $config->enabled ? 1 : 0);
+
+        // Without groups nothing can be mapped, but the feature can still be switched off and saved.
+        if (empty($groups)) {
+            $link = html_writer::link(
+                new moodle_url('/group/index.php', ['id' => $course->id]),
+                get_string('auto_group_enrol_form_no_group_found', 'tool_ltigroupautoenrol')
+            );
+            $mform->addElement('static', 'no_group_found', '', $link);
+            $this->add_action_buttons();
+            return;
+        }
 
         if (empty($tools)) {
             $link = html_writer::link(
@@ -161,6 +163,17 @@ class manage_lti_group_auto_enrol_form extends moodleform {
     public function validation($data, $files): array {
         $errors = parent::validation($data, $files);
         $groups = $this->_customdata['groups'];
+        // Group selects of tools that are not offered for this course (manipulated request) are rejected,
+        // not silently dropped.
+        foreach (array_keys($this->_form->getSubmitValues()) as $field) {
+            if (
+                preg_match('/^groups_(\d+)$/', (string) $field, $matches)
+                && !isset($this->_customdata['tools'][(int) $matches[1]])
+            ) {
+                $errors['enable_enrol'] = get_string('error_unknowntool', 'tool_ltigroupautoenrol');
+                break;
+            }
+        }
         foreach (array_keys($this->_customdata['tools']) as $toolid) {
             $name = self::get_element_name((int) $toolid);
             $raw = $this->_form->getSubmitValue($name);

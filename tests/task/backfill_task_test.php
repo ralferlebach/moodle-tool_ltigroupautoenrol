@@ -193,4 +193,96 @@ final class backfill_task_test extends \advanced_testcase {
             $lock->release();
         }
     }
+
+    /**
+     * A failure of the enrolment observer after the preview stays visible after the backfill (the approved set
+     * does not contain that participant); failures are cleared once nobody eligible misses a membership.
+     */
+    public function test_event_errors_are_cleared_only_when_nothing_is_missing(): void {
+        global $DB;
+        $this->resetAfterTest();
+        [$course, $tool, $groupid, $userid, $plugingen] = $this->create_scenario();
+        $DB->execute(
+            'UPDATE {user_enrolments} SET timecreated = 1000, timemodified = 1000, timestart = 1000 WHERE userid = ?',
+            [$userid]
+        );
+        $plugingen->create_config($course->id, [$tool->id => [$groupid]], false);
+        $late = $this->getDataGenerator()->create_user();
+        $plugingen->enrol_via_lti($tool, $late->id);
+        $DB->execute('UPDATE {user_enrolments} SET timecreated = 3000, timemodified = 3000 WHERE userid = ?', [$late->id]);
+        $config = $plugingen->create_config($course->id, [$tool->id => [$groupid]], true);
+        // The observer failed for the late enrolment after the preview (time 2000).
+        config_repository::record_event_errors($course->id, 1, 3000);
+
+        $this->expectOutputRegex('/"added":1/');
+        backfill_task::create($course->id, $config->mapping->get_hash(), 2000)->execute();
+        $this->assertTrue(groups_is_member($groupid, $userid));
+        $this->assertFalse(groups_is_member($groupid, $late->id));
+        $this->assertSame(1, config_repository::get_event_errors($course->id)->count);
+
+        // A later run without time limit assigns the late participant; now nothing is missing and the failure is cleared.
+        backfill_task::create($course->id, $config->mapping->get_hash(), time())->execute();
+        $this->assertTrue(groups_is_member($groupid, $late->id));
+        $this->assertNull(config_repository::get_event_errors($course->id));
+    }
+
+    /**
+     * An exception during the run records "failed" instead of leaving "running", and is rethrown for the task API;
+     * the retry succeeds and records "done".
+     */
+    public function test_exception_records_failed_and_retry_recovers(): void {
+        $this->resetAfterTest();
+        [$course, $tool, $groupid, $userid, $plugingen] = $this->create_scenario();
+        $config = $plugingen->create_config($course->id, [$tool->id => [$groupid]]);
+        $task = new class extends backfill_task {
+            /**
+             * Simulates a database failure in the middle of the run.
+             *
+             * @param course_config $config
+             * @param int|null $previewtime
+             * @return assignment_result
+             */
+            protected function run_backfill(course_config $config, ?int $previewtime): assignment_result {
+                throw new \dml_write_exception('simulated');
+            }
+        };
+        $task->set_custom_data(['courseid' => $course->id, 'hash' => $config->mapping->get_hash(), 'previewtime' => time()]);
+
+        ob_start();
+        try {
+            $task->execute();
+            $this->fail('Expected the exception to reach the task API');
+        } catch (\dml_write_exception $e) {
+            $this->assertStringContainsString('simulated', $e->debuginfo);
+        } finally {
+            $output = ob_get_clean();
+        }
+        $this->assertStringContainsString('failed: dml_write_exception', $output);
+        $this->assertSame(config_repository::BACKFILL_FAILED, config_repository::get_last_backfill($course->id)->status);
+        // The lock was released, so the retry can run.
+        $this->expectOutputRegex('/"added":1/');
+        backfill_task::create($course->id, $config->mapping->get_hash())->execute();
+        $this->assertSame(config_repository::BACKFILL_DONE, config_repository::get_last_backfill($course->id)->status);
+        $this->assertTrue(groups_is_member($groupid, $userid));
+    }
+
+    /**
+     * is_pending() only finds tasks of the given course, also among many queued tasks of other courses.
+     */
+    public function test_is_pending_is_course_specific(): void {
+        $this->resetAfterTest();
+        $courses = [];
+        for ($i = 0; $i < 12; $i++) {
+            $courses[$i] = $this->getDataGenerator()->create_course();
+            if ($i !== 1) {
+                \core\task\manager::queue_adhoc_task(backfill_task::create($courses[$i]->id, sha1((string) $i), 1000));
+            }
+        }
+        foreach ($courses as $i => $course) {
+            $this->assertSame($i !== 1, backfill_task::is_pending($course->id), "course index $i");
+        }
+        // Queued courses with ids 1x must not match the site course id 1 (prefix of the JSON value).
+        $this->assertGreaterThan(10, (int) end($courses)->id);
+        $this->assertFalse(backfill_task::is_pending((int) SITEID));
+    }
 }

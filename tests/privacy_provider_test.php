@@ -57,7 +57,10 @@ final class privacy_provider_test extends provider_testcase {
         $columns = array_keys($DB->get_columns('tool_ltigroupautoenrol'));
         sort($columns);
         $this->assertSame(
-            ['backfill_result', 'backfill_time', 'courseid', 'enable_enrol', 'event_errors', 'event_errortime', 'id', 'settings'],
+            [
+                'backfill_result', 'backfill_time', 'courseid', 'enable_enrol', 'event_errorlast', 'event_errors',
+                'event_errortime', 'id', 'settings',
+            ],
             $columns
         );
     }

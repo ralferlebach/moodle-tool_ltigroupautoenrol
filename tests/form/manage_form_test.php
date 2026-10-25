@@ -125,10 +125,10 @@ final class manage_form_test extends \advanced_testcase {
     }
 
     /**
-     * A tool deleted after the form was rendered: its select is gone, a submission for it is ignored,
-     * and its stale mapping is dropped on save.
+     * A tool deleted after the form was rendered: a stale submission for it is rejected, and its mapping
+     * is dropped on the next save.
      */
-    public function test_deleted_tool_is_ignored(): void {
+    public function test_deleted_tool_is_rejected_and_dropped(): void {
         global $DB;
         $toolid = (int) $this->tool->id;
         config_repository::save(new \tool_ltigroupautoenrol\local\course_config(
@@ -139,11 +139,13 @@ final class manage_form_test extends \advanced_testcase {
         $instance = $DB->get_record('enrol', ['id' => $this->tool->enrolid], '*', MUST_EXIST);
         enrol_get_plugin('lti')->delete_instance($instance);
 
+        // A stale form still submitting the select of the deleted tool is rejected; reloading shows the current tools.
         $form = $this->submit(['enable_enrol' => 1, 'groups_' . $toolid => [$this->group]]);
-        $data = $form->get_data();
+        $this->assertNull($form->get_data());
 
+        $form = $this->submit(['enable_enrol' => 1]);
+        $data = $form->get_data();
         $this->assertNotNull($data);
-        $this->assertFalse(property_exists($data, 'groups_' . $toolid));
         $this->assertTrue($form->get_mapping($data)->is_empty());
     }
 
@@ -156,13 +158,49 @@ final class manage_form_test extends \advanced_testcase {
     }
 
     /**
-     * A select for a tool of another course does not exist, so its values never reach the mapping.
-     * The former hidden fields (ltitoolid_*, ltitoolcount) are gone and have no effect.
+     * A group select of a tool of another course (or of a deleted or invented tool) is rejected with a form error,
+     * not silently dropped.
+     *
+     * @dataProvider unknown_tool_provider
+     * @param string $which "foreign", "deleted" or "invented".
      */
-    public function test_foreign_tool_and_legacy_fields_are_ignored(): void {
+    public function test_unknown_tool_is_rejected(string $which): void {
+        $toolid = [
+            'foreign' => $this->foreigntool->id,
+            'deleted' => $this->foreigntool->id + 1000,
+            'invented' => 999999,
+        ][$which];
         $form = $this->submit([
             'enable_enrol' => 1,
-            'groups_' . $this->foreigntool->id => [$this->foreigngroup],
+            'groups_' . $this->tool->id => [$this->group],
+            'groups_' . $toolid => [$this->group],
+        ]);
+        $this->assertNull($form->get_data());
+        $this->assertSame(
+            get_string('error_unknowntool', 'tool_ltigroupautoenrol'),
+            $form->validation(['enable_enrol' => 1], [])['enable_enrol']
+        );
+    }
+
+    /**
+     * Unknown tools for {@see test_unknown_tool_is_rejected()}.
+     *
+     * @return array
+     */
+    public static function unknown_tool_provider(): array {
+        return [
+            'tool of another course' => ['foreign'],
+            'deleted tool' => ['deleted'],
+            'invented tool id' => ['invented'],
+        ];
+    }
+
+    /**
+     * The former hidden fields (ltitoolid_*, ltitoolcount, groupslist_*) are gone and have no effect.
+     */
+    public function test_legacy_fields_are_ignored(): void {
+        $form = $this->submit([
+            'enable_enrol' => 1,
             'ltitoolcount' => 5,
             'ltitoolid_0' => $this->foreigntool->id,
             'groupslist_0' => [$this->foreigngroup],
@@ -184,5 +222,33 @@ final class manage_form_test extends \advanced_testcase {
             $gen->enrol_user($user->id, $this->course->id, $role);
             $this->assertSame($allowed, has_capability('tool/ltigroupautoenrol:manage', $context, $user), $role);
         }
+    }
+
+    /**
+     * Configured feature, then all groups deleted: the switch and the save button remain, so it can be switched off.
+     */
+    public function test_switch_off_without_groups(): void {
+        global $CFG;
+        require_once($CFG->dirroot . '/group/lib.php');
+        $this->getDataGenerator()->get_plugin_generator('tool_ltigroupautoenrol')
+            ->create_config($this->course->id, [$this->tool->id => [$this->group]]);
+        groups_delete_group($this->group);
+        $this->assertSame([], groups_get_all_groups($this->course->id));
+
+        manage_lti_group_auto_enrol_form::mock_submit(['enable_enrol' => 0, 'submitbutton' => 'Save']);
+        $form = new manage_lti_group_auto_enrol_form(null, [
+            'course' => $this->course,
+            'tools' => lti_resolver::get_course_tools($this->course->id),
+            'groups' => [],
+            'config' => config_repository::get_or_default($this->course->id),
+        ]);
+        ob_start();
+        $form->display();
+        $html = ob_get_clean();
+        $this->assertStringContainsString('name="enable_enrol"', $html);
+        $this->assertStringContainsString('name="submitbutton"', $html);
+        $data = $form->get_data();
+        $this->assertNotNull($data);
+        $this->assertSame('0', (string) $data->enable_enrol);
     }
 }

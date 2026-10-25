@@ -22,7 +22,8 @@ use tool_ltigroupautoenrol\task\backfill_task;
  * Handles the confirmation (POST) of the backfill page.
  *
  * Kept out of backfill.php so every outcome can be tested. The page checks login, capability
- * and sesskey before calling {@see confirm()}.
+ * and sesskey before calling {@see confirm_token()}; the approved preview (time and mapping
+ * fingerprint) is taken from the server-side {@see preview_checkpoint}, never from the request.
  *
  * @package    tool_ltigroupautoenrol
  * @copyright  2026 Ralf Erlebach
@@ -41,6 +42,27 @@ final class backfill_controller {
 
     /** @var string The feature is disabled or nothing is mapped. */
     public const DISABLED = 'disabled';
+
+    /** @var string The preview token is unknown, expired, already used or belongs to another course. */
+    public const EXPIRED = 'expired';
+
+    /**
+     * Queues the backfill of the preview identified by a token of {@see preview_checkpoint}.
+     *
+     * @param int $courseid
+     * @param string $token Token of the preview page.
+     * @param int|null $now Defaults to time().
+     * @return string One of the class constants.
+     * @throws invalid_mapping_exception If the stored mapping is corrupt.
+     */
+    public static function confirm_token(int $courseid, string $token, ?int $now = null): string {
+        $now = $now ?? time();
+        $preview = preview_checkpoint::consume($courseid, $token, $now);
+        if (!$preview) {
+            return self::EXPIRED;
+        }
+        return self::confirm($courseid, $preview->hash, $preview->time, $now);
+    }
 
     /**
      * Queues the backfill a user confirmed on the preview page.
@@ -64,7 +86,7 @@ final class backfill_controller {
         if (backfill_task::is_pending($courseid)) {
             return self::PENDING;
         }
-        // A manipulated future time could only widen the set to enrolments the observer handles anyway.
+        // Defensive only: the preview time comes from the server-side checkpoint, not from the request.
         $previewtime = min($previewtime, $now);
         \core\task\manager::queue_adhoc_task(backfill_task::create($courseid, $confirmedhash, $previewtime), true);
         config_repository::record_backfill_status($courseid, config_repository::BACKFILL_QUEUED, null, $now);

@@ -294,13 +294,16 @@ final class observer_test extends \advanced_testcase {
         $this->assertDebuggingCalled();
         ini_set('error_log', $errorlog);
 
-        // Visible on the settings page until a complete backfill.
-        $this->assertSame(4, config_repository::get_event_errors($courseid)->count);
-        $partial = new \tool_ltigroupautoenrol\local\assignment_result();
-        $partial->errors = 1;
-        config_repository::record_backfill($courseid, $partial);
+        // Visible on the settings page until a backfill verified that nothing is missing any more. A finished
+        // backfill alone clears nothing; clearing keeps failures recorded at or after the check time.
         $this->assertSame(4, config_repository::get_event_errors($courseid)->count);
         config_repository::record_backfill($courseid, new \tool_ltigroupautoenrol\local\assignment_result());
+        $this->assertSame(4, config_repository::get_event_errors($courseid)->count);
+        $last = time() + 100;
+        config_repository::record_event_errors($courseid, 1, $last);
+        config_repository::clear_event_errors($courseid, $last);
+        $this->assertSame(5, config_repository::get_event_errors($courseid)->count);
+        config_repository::clear_event_errors($courseid, $last + 1);
         $this->assertNull(config_repository::get_event_errors($courseid));
     }
 

@@ -215,9 +215,118 @@ jobs:
       - name: Upgrade from the published 1.0.1
         run: bash plugin/tests/upgrade/upgrade_e2e.sh moodle plugin
 
+  playwright:
+    # Browser tests (page identity, axe WCAG 2.1 A/AA, keyboard and focus, reflow, German UI, access denial)
+    # on the lower and upper supported branch. Part of this workflow so that release-package depends on it.
+    runs-on: ubuntu-22.04
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Moodle 4.5: classic layout, web root = Moodle root.
+          - {moodle-branch: MOODLE_405_STABLE, php: '8.3', pg: '16', langpack: '4.5', plugin-path: admin/tool/ltigroupautoenrol, webroot: moodle}
+          # Moodle 5.3: public/ layout (since 5.1), PostgreSQL >= 17.
+          - {moodle-branch: MOODLE_503_STABLE, php: '8.4', pg: '17', langpack: '5.3', plugin-path: public/admin/tool/ltigroupautoenrol, webroot: moodle/public}
+
+    services:
+      postgres:
+        image: postgres:${{ matrix.pg }}
+        env:
+          POSTGRES_USER: moodle
+          POSTGRES_PASSWORD: moodle
+          POSTGRES_DB: moodle
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready" --health-interval=10s
+          --health-timeout=5s --health-retries=5
+
+    env:
+      MOODLE_BRANCH: ${{ matrix.moodle-branch }}
+      MOODLE_WWWROOT: http://127.0.0.1:8000
+      PLUGIN_PATH: ${{ matrix.plugin-path }}
+      MOODLE_WEBROOT: ${{ matrix.webroot }}
+      LANGPACK: ${{ matrix.langpack }}
+
+    steps:
+      - name: Check out plugin
+        uses: actions/checkout@v4
+        with:
+          path: plugin
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: pgsql, gd, intl, zip, soap, mbstring, curl, xml, exif
+          ini-values: max_input_vars=5000
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Check out Moodle and install the plugin
+        run: |
+          git clone --depth 1 --branch "$MOODLE_BRANCH" https://github.com/moodle/moodle.git moodle
+          mkdir -p "$(dirname "moodle/$PLUGIN_PATH")"
+          cp -a plugin "moodle/$PLUGIN_PATH"
+          rm -rf "moodle/$PLUGIN_PATH/.git"
+          # Since Moodle 5.1, third-party libraries (Guzzle, Slim, Mustache, ...) come from Composer.
+          cd moodle && composer install --no-interaction --no-dev --no-progress
+
+      - name: Install Moodle site with the German language pack
+        run: |
+          mkdir -p /tmp/moodledata/lang
+          curl -sSL -o /tmp/de.zip https://download.moodle.org/download.php/direct/langpack/$LANGPACK/de.zip
+          unzip -q /tmp/de.zip -d /tmp/moodledata/lang
+          cd moodle
+          php admin/cli/install.php \
+            --non-interactive --agree-license \
+            --dbtype=pgsql --dbhost=127.0.0.1 --dbport=5432 --dbname=moodle \
+            --dbuser=moodle --dbpass=moodle \
+            --wwwroot="$MOODLE_WWWROOT" --dataroot=/tmp/moodledata \
+            --fullname="CI" --shortname="CI" \
+            --adminpass="Admin!23" --adminemail=ci@example.invalid
+
+      - name: Seed fixture
+        run: |
+          cd moodle
+          php "$PLUGIN_PATH/tests/playwright/seed.php" > /tmp/ltigae-seed.env
+          sed -n "s/^export \([A-Z_][A-Z_]*\)='\(.*\)'$/\1=\2/p" /tmp/ltigae-seed.env >> "$GITHUB_ENV"
+
+      - name: Install Playwright and browser
+        run: |
+          cd "moodle/$PLUGIN_PATH/tests/playwright"
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Run Playwright tests
+        run: |
+          cd "moodle/$PLUGIN_PATH/tests/playwright"
+          PHP_CLI_SERVER_WORKERS=8 php -S 127.0.0.1:8000 -t "$GITHUB_WORKSPACE/$MOODLE_WEBROOT" \
+            >/tmp/moodle-server.log 2>&1 &
+          for i in $(seq 1 40); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 http://127.0.0.1:8000/login/index.php || true)
+            [ "$code" = "200" ] && break
+            sleep 3
+          done
+          [ "$code" = "200" ] || { echo "Moodle not reachable (HTTP $code)"; tail -50 /tmp/moodle-server.log; exit 1; }
+          npm test
+
+      - name: Upload report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ matrix.moodle-branch }}-${{ github.sha }}
+          path: moodle/${{ env.PLUGIN_PATH }}/tests/playwright/playwright-report
+          retention-days: 14
+
   release-package:
-    # Builds the installable ZIP exactly as "git archive" produces it and records its identity.
-    needs: [test, upgrade-e2e]
+    # Builds the installable ZIP exactly as "git archive" produces it, only after every hard gate
+    # (all test cells, upgrade-e2e and playwright) has passed, and records its identity.
+    needs: [test, upgrade-e2e, playwright]
     runs-on: ubuntu-22.04
     outputs:
       zip: ${{ steps.evidence.outputs.zip }}
@@ -237,6 +346,19 @@ jobs:
         run: |
           unzip -Z1 "$ZIP" > contents.txt
           cat contents.txt
+          # Inventory: exactly the tracked files minus the export-ignore paths of .gitattributes, and no
+          # runtime path may be export-ignored.
+          ignored=$(awk '$2 == "export-ignore" {print $1}' .gitattributes)
+          for path in $ignored; do
+            case "$path" in
+              classes*|db*|lang*|backup*|cli*|templates*|amd*|pix*|tests/generator*|*.php)
+                echo "::error::Runtime path $path is export-ignored"; exit 1;;
+            esac
+          done
+          pattern=$(printf '%s\n' $ignored | sed 's/[.]/\\./g' | paste -sd'|')
+          git ls-files | grep -Ev "^(${pattern})(/|$)" | sort > expected.txt
+          grep -v '/$' contents.txt | sed 's#^ltigroupautoenrol/##' | sort > actual.txt
+          diff expected.txt actual.txt || { echo "::error::ZIP inventory differs from the tracked runtime files"; exit 1; }
           # Development-only files must not be shipped.
           if grep -E '^ltigroupautoenrol/(\.github/|\.gitattributes|\.gitignore|node_modules/|vendor/|tests/playwright/|tests/upgrade/)|\.DS_Store' contents.txt; then
             echo "::error::Release ZIP contains development files"; exit 1
@@ -267,10 +389,91 @@ jobs:
             ${{ env.ZIP }}
             ${{ env.ZIP }}.sha256
 
+  release-smoke:
+    # Installs exactly the built ZIP on a fresh site and runs the production path once
+    # (.github/scripts/release_smoke.php): installed version, LTI enrolment -> group, preview, backfill, deletion.
+    needs: release-package
+    runs-on: ubuntu-22.04
+
+    services:
+      postgres:
+        image: postgres:${{ matrix.pg }}
+        env:
+          POSTGRES_USER: 'postgres'
+          POSTGRES_HOST_AUTH_METHOD: 'trust'
+        ports:
+          - 5432:5432
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 3
+      mariadb:
+        image: mariadb:${{ matrix.mariadb }}
+        env:
+          MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: "true"
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval 10s --health-timeout 5s --health-retries 10
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {php: '8.3', moodle-branch: MOODLE_405_STABLE, database: pgsql, pg: '16', mariadb: '10.11', plugin-path: admin/tool}
+          - {php: '8.4', moodle-branch: MOODLE_503_STABLE, database: mariadb, pg: '17', mariadb: '11.4', plugin-path: public/admin/tool}
+
+    steps:
+      - name: Check out repository code (smoke script only; the plugin comes from the ZIP)
+        uses: actions/checkout@v4
+        with:
+          path: plugin
+
+      - name: Download the release ZIP
+        uses: actions/download-artifact@v4
+        with:
+          name: tool_ltigroupautoenrol-${{ github.sha }}
+          path: release
+
+      - name: Setup PHP ${{ matrix.php }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: pgsql, mysqli, gd, intl, zip, soap, mbstring, curl, xml, exif, sodium
+          ini-values: max_input_vars=5000
+          coverage: none
+
+      - name: Check out Moodle and install the ZIP
+        run: |
+          (cd release && sha256sum -c ./*.zip.sha256)
+          git clone --depth 1 --branch "${{ matrix.moodle-branch }}" https://github.com/moodle/moodle.git moodle
+          (cd moodle && composer install --no-interaction --no-dev --no-progress)
+          mkdir -p "moodle/${{ matrix.plugin-path }}"
+          unzip -q release/*.zip -d "moodle/${{ matrix.plugin-path }}"
+          ls "moodle/${{ matrix.plugin-path }}/ltigroupautoenrol/version.php"
+
+      - name: Install a fresh site with the plugin
+        run: |
+          if [ "${{ matrix.database }}" = pgsql ]; then
+            psql -h 127.0.0.1 -U postgres -c "CREATE DATABASE moodle ENCODING 'UTF8' TEMPLATE template0;"
+            dbuser=postgres; dbport=5432
+          else
+            mysql -h 127.0.0.1 -uroot -e "CREATE DATABASE moodle DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+            dbuser=root; dbport=3306
+          fi
+          cd moodle
+          php admin/cli/install.php --non-interactive --agree-license \
+            --dbtype=${{ matrix.database }} --dbhost=127.0.0.1 --dbport=$dbport --dbname=moodle --dbuser=$dbuser --dbpass= \
+            --wwwroot=http://127.0.0.1 --dataroot=/tmp/moodledata \
+            --fullname=Smoke --shortname=Smoke --adminpass='Admin!23' --adminemail=admin@example.invalid
+          php admin/cli/check_database_schema.php | tee schema.log
+          grep -qx "Database structure is ok." schema.log
+
+      - name: Smoke test of the installed ZIP
+        run: php plugin/.github/scripts/release_smoke.php "$PWD/moodle" "$PWD/moodle/${{ matrix.plugin-path }}/ltigroupautoenrol"
+
   release-evidence:
     # Collects the result of every job and matrix cell of this run, the Playwright run of the same commit
     # and the identity of the release ZIP into one record (step summary and artifact), also when a job failed.
-    needs: [test, upgrade-e2e, release-package]
+    needs: [test, upgrade-e2e, playwright, release-package, release-smoke]
     if: ${{ always() }}
     runs-on: ubuntu-22.04
     permissions:
@@ -282,20 +485,26 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           ZIP: ${{ needs.release-package.outputs.zip }}
           ZIPSHA: ${{ needs.release-package.outputs.sha256 }}
+          GATES: >-
+            test=${{ needs.test.result }} upgrade-e2e=${{ needs.upgrade-e2e.result }}
+            playwright=${{ needs.playwright.result }} release-package=${{ needs.release-package.result }}
+            release-smoke=${{ needs.release-smoke.result }}
         run: |
           run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT/jobs?per_page=100" \
             --jq '.jobs[] | select(.name != "release-evidence") | "| \(.name) | \(.conclusion // .status) | [log](\(.html_url)) |"' \
             | sort > cells.md
-          gh api "repos/$GITHUB_REPOSITORY/actions/workflows/playwright.yml/runs?head_sha=$GITHUB_SHA&per_page=1" \
-            --jq '.workflow_runs[0] | if . == null then "not found" else "\(.conclusion // .status): \(.html_url)" end' \
-            > playwright.txt || echo "not available" > playwright.txt
+          releasable=yes
+          for gate in $GATES; do
+            [ "${gate#*=}" = success ] || releasable=no
+          done
           {
             echo "## Release evidence tool_ltigroupautoenrol"
             echo
             echo "- Commit: \`$GITHUB_SHA\` ($GITHUB_REF_NAME)"
             echo "- CI run: $run_url (attempt $GITHUB_RUN_ATTEMPT)"
-            echo "- Playwright run of this commit: $(cat playwright.txt)"
+            echo "- Gates: $GATES"
+            echo "- **Releasable: $releasable** (all gates must be success; the ZIP is built only after test, upgrade-e2e and playwright)"
             echo "- Release ZIP: \`${ZIP:-not built}\`"
             echo "- SHA-256: \`${ZIPSHA:-not built}\`"
             echo

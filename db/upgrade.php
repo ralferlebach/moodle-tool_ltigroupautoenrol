@@ -61,5 +61,15 @@ function xmldb_tool_ltigroupautoenrol_upgrade(int $oldversion): bool {
 
         upgrade_plugin_savepoint(true, 2026100801, 'tool', 'ltigroupautoenrol');
     }
+
+    if ($oldversion < 2026102500) {
+        // Time of the last unresolved failure of the enrolment observer: a backfill clears only failures
+        // recorded before its final check (see config_repository::clear_event_errors()).
+        foreach (tool_ltigroupautoenrol_upgrade_add_backfill_status() as $line) {
+            mtrace('tool_ltigroupautoenrol: ' . $line);
+        }
+
+        upgrade_plugin_savepoint(true, 2026102500, 'tool', 'ltigroupautoenrol');
+    }
     return true;
 }

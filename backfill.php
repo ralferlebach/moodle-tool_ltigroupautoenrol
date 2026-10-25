@@ -17,8 +17,10 @@
 /**
  * Backfill: preview (read-only) and confirmed queueing of the assignment of existing LTI participants.
  *
- * GET shows the preview and never writes. POST (sesskey, confirmed mapping fingerprint) queues
- * an adhoc task; if the configuration changed after the preview, the user has to confirm again.
+ * GET shows the preview and never writes to the database; the time and mapping fingerprint of the
+ * preview are kept server-side (preview_checkpoint) and the confirm button only carries a one-time
+ * token. POST (sesskey, token) queues an adhoc task; if the preview expired or the configuration
+ * changed after it, the user has to confirm again.
  *
  * @package    tool_ltigroupautoenrol
  * @copyright  2026 Ralf Erlebach
@@ -32,6 +34,7 @@ use tool_ltigroupautoenrol\local\backfill_controller;
 use tool_ltigroupautoenrol\local\backfill_status;
 use tool_ltigroupautoenrol\local\config_repository;
 use tool_ltigroupautoenrol\local\invalid_mapping_exception;
+use tool_ltigroupautoenrol\local\preview_checkpoint;
 use tool_ltigroupautoenrol\task\backfill_task;
 
 require_once(__DIR__ . '/../../../config.php');
@@ -64,12 +67,24 @@ $pending = backfill_task::is_pending($course->id);
 
 if (data_submitted()) {
     require_sesskey();
-    $outcome = backfill_controller::confirm(
-        $course->id,
-        required_param('hash', PARAM_ALPHANUM),
-        required_param('previewtime', PARAM_INT)
-    );
+    $outcome = backfill_controller::confirm_token($course->id, required_param('token', PARAM_ALPHANUM));
     switch ($outcome) {
+        case backfill_controller::EXPIRED:
+            redirect(
+                $url,
+                get_string('backfill_expired', 'tool_ltigroupautoenrol'),
+                null,
+                \core\output\notification::NOTIFY_WARNING
+            );
+            break;
+        case backfill_controller::PENDING:
+            redirect(
+                $settingsurl,
+                get_string('backfill_pending', 'tool_ltigroupautoenrol'),
+                null,
+                \core\output\notification::NOTIFY_INFO
+            );
+            break;
         case backfill_controller::CHANGED:
             redirect(
                 $url,
@@ -81,13 +96,16 @@ if (data_submitted()) {
         case backfill_controller::DISABLED:
             redirect($settingsurl);
             break;
-        default:
+        case backfill_controller::QUEUED:
             redirect(
                 $settingsurl,
                 get_string('backfill_queued', 'tool_ltigroupautoenrol'),
                 null,
                 \core\output\notification::NOTIFY_SUCCESS
             );
+            break;
+        default:
+            throw new coding_exception('Unknown backfill outcome: ' . $outcome);
     }
 }
 
@@ -106,7 +124,9 @@ if (!$config->enabled || $config->mapping->is_empty()) {
 
 echo html_writer::tag('p', get_string('backfill_intro', 'tool_ltigroupautoenrol'));
 
-$rows = assignment_service::preview($config);
+// The approved set is "eligible at this time": taken before the preview queries, not when the button is rendered.
+$previewtime = time();
+$rows = assignment_service::preview($config, $previewtime);
 $table = new html_table();
 $table->caption = get_string('backfill_tablecaption', 'tool_ltigroupautoenrol');
 $table->head = [
@@ -147,8 +167,7 @@ if ($pending) {
         get_string('backfill_confirm', 'tool_ltigroupautoenrol', $totalmissing),
         new single_button(
             new moodle_url($url, [
-                'hash' => $config->mapping->get_hash(),
-                'previewtime' => time(),
+                'token' => preview_checkpoint::create($course->id, $config->mapping->get_hash(), $previewtime),
                 'sesskey' => sesskey(),
             ]),
             get_string('backfill_run', 'tool_ltigroupautoenrol'),

@@ -33,7 +33,7 @@ Feature: Configure LTI group auto enrolment
     And I click on ".dropdown-toggle:contains('Enrolled users')" "css_element"
     And I click on ".dropdown-item:contains('LTI-enrol in groups')" "css_element"
     Then I should see "Create groups first!"
-    And I should not see "Enable automatic enrolment in groups for this course"
+    And I should see "Enable automatic enrolment in groups for this course"
 
   @javascript
   Scenario: Non-editing teachers do not see the link
@@ -46,6 +46,31 @@ Feature: Configure LTI group auto enrolment
     Given I am on the "C1" "tool_ltigroupautoenrol > settings" page logged in as "teacher1"
     When I click on "Create groups first!" "link"
     Then I should see "Create group"
+
+  # Deleting a group on the groups page needs JavaScript (the delete button is enabled by the selection).
+  @javascript
+  Scenario: The feature can be switched off after all groups were deleted
+    Given the following "groups" exist:
+      | name    | course | idnumber |
+      | Group A | C1     | GA       |
+    And the following "tool_ltigroupautoenrol > lti tools" exist:
+      | course | name   |
+      | C1     | Tool 1 |
+    And I am on the "C1" "tool_ltigroupautoenrol > settings" page logged in as "teacher1"
+    And I set the field "Enable automatic enrolment in groups for this course" to "1"
+    And I set the field "Groups for LTI tool: Tool 1" to "Group A"
+    And I press "Save changes"
+    And I am on the "C1" "groups" page
+    And I set the field "groups" to "Group A (0)"
+    And I press "Delete"
+    And I press "Yes"
+    When I am on the "C1" "tool_ltigroupautoenrol > settings" page
+    Then I should see "Create groups first!"
+    And the field "Enable automatic enrolment in groups for this course" matches value "1"
+    And I set the field "Enable automatic enrolment in groups for this course" to "0"
+    And I press "Save changes"
+    And I should see "Changes saved"
+    And the field "Enable automatic enrolment in groups for this course" matches value "0"
 
   Scenario: The navigation link follows the capability of the settings page
     When I am on the "C1" "enrolled users" page logged in as "teacher1"

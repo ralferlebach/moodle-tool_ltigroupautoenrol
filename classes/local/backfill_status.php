@@ -17,9 +17,10 @@
 namespace tool_ltigroupautoenrol\local;
 
 use core\output\notification;
+use tool_ltigroupautoenrol\task\backfill_task;
 
 /**
- * Human readable status of the backfill of a course (queued, running, done, skipped).
+ * Human readable status of the backfill of a course (queued, running, done, skipped, failed, interrupted).
  *
  * The settings page and the preview page show the same message, rendered as a Moodle
  * notification, which carries role="alert" for assistive technology.
@@ -42,11 +43,18 @@ final class backfill_status {
             return null;
         }
         $last->time = userdate($last->time);
+        $unfinished = [config_repository::BACKFILL_QUEUED, config_repository::BACKFILL_RUNNING, config_repository::BACKFILL_FAILED];
+        if (in_array($last->status, $unfinished, true) && !backfill_task::is_pending($courseid)) {
+            // The task is gone (removed or given up after its retries) without recording a result.
+            return [get_string('backfill_status_interrupted', 'tool_ltigroupautoenrol', $last), notification::NOTIFY_ERROR];
+        }
         switch ($last->status) {
             case config_repository::BACKFILL_QUEUED:
                 return [get_string('backfill_status_queued', 'tool_ltigroupautoenrol', $last), notification::NOTIFY_INFO];
             case config_repository::BACKFILL_RUNNING:
                 return [get_string('backfill_status_running', 'tool_ltigroupautoenrol', $last), notification::NOTIFY_INFO];
+            case config_repository::BACKFILL_FAILED:
+                return [get_string('backfill_status_failed', 'tool_ltigroupautoenrol', $last), notification::NOTIFY_WARNING];
             case config_repository::BACKFILL_SKIPPED:
                 return [get_string('backfill_status_skipped', 'tool_ltigroupautoenrol', $last), notification::NOTIFY_WARNING];
             default:

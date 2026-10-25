@@ -4,13 +4,14 @@
 
 Supported upgrade baselines: 0.1 (2024050100 - 2024090802), the published 1.0 (2024093000) and 1.0.1 (2024100600) and all versions up to 1.1 (2026030700). The original database schema of each baseline is kept in tests/fixtures (checked against the ZIPs published in the Moodle plugins directory); the PHPUnit tests upgrade from each of them, and the CI runs them on PostgreSQL and MariaDB. In addition, the CI job `upgrade-e2e` upgrades a real site from the published 1.0.1 exactly as described below.
 
-The upgrade to 1.2 (2026100800, 2026100801)
+The upgrade to 1.2 (2026100800, 2026100801, 2026102500)
 
 * adds the field "settings" to installations that were upgraded from 0.1 and removes the unused tool_groupautoenrol fields of 0.1 (0.1 never evaluated them),
 * removes configurations of deleted courses and duplicate configurations of a course (the oldest row is kept, because it was the one in effect),
 * adds a unique key on the course and the fields for the backfill status,
 * rewrites stored mappings into a canonical format; invalid mappings are kept and ignored at runtime,
-* (2026100801) adds the backfill status fields to sites that installed the pre-release state of 2026100800 from pull request #11; on all other sites this step changes nothing.
+* (2026100801) adds the backfill status fields to sites that installed the pre-release state of 2026100800 from pull request #11; on all other sites this step changes nothing,
+* (2026102500) adds the field "event_errorlast" (time of the last unresolved failure of the enrolment observer); existing counters are kept.
 
 Nothing is removed without a backup: every removed value and row is written as JSON to moodledata/tool_ltigroupautoenrol/upgrade-*.json, and the upgrade output names the files.
 
@@ -26,6 +27,24 @@ Recommended procedure:
 Rollback: Moodle does not support downgrading a plugin. Restore the database backup together with the previous plugin code. Single removed rows can also be restored from the JSON backup files.
 
 # Changelog
+
+## 1.2 (2026102500)
+
+Findings of the code audit of 2026-10-09 (commit bfabdb7):
+
+- A-01 Release gate: the Playwright tests are a job of the main workflow; the release ZIP is built only after all test cells, the upgrade test and Playwright have passed. The separate playwright.yml is gone.
+- A-02 Failures of the enrolment observer are no longer cleared by every error-free backfill (a backfill only covers the participants of its preview). They are cleared only if, after the run, no eligible participant misses a membership, and only failures recorded before that check (new field `event_errorlast`, upgrade step 2026102500).
+- A-03 The confirmation of "Assign existing LTI participants" is bound to the preview on the server: time and mapping fingerprint are stored in the session, the button only carries a one-time token (expires after one hour, bound to the course). The preview time is taken before the preview queries.
+- A-04 A backfill that fails with an exception records the status "failed" instead of staying "running"; the exception is passed on so the task API retries it. A run that is no longer queued without a result is shown as "interrupted".
+- A-05 Backup, restore, course copy and duplication carry the configuration over; LTI tools and groups are mapped to the restored ones (backup/moodle2).
+- A-06 `backfill_task::is_pending()` checks the course in the database instead of loading all queued tasks of the class.
+- A-07 The preview counts missing memberships with one query per tool, independent of the number of groups.
+- A-08 The on/off switch is also shown without groups, so the feature can be switched off after all groups were deleted.
+- A-09 A confirmation while a run is queued says so instead of "has been scheduled".
+- A-10 Additive semantics (no automatic revocation) documented in detail and covered by tests (mapping change, disabling, unenrolment, tool deletion).
+- A-11 Release smoke test: the CI installs exactly the built ZIP on a fresh Moodle 4.5 and 5.3 site and runs the production path once; the ZIP inventory is checked against the tracked runtime files.
+- A-12 Group selects of tools that do not belong to the course (foreign, deleted, invented) are rejected with a form error instead of being ignored.
+- A-13 README badges per branch (main = released, development = next).
 
 ## 1.2 (2026100901)
 

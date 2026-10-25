@@ -71,7 +71,10 @@ $form = new manage_lti_group_auto_enrol_form($url, [
 if ($form->is_cancelled()) {
     redirect(new moodle_url('/course/view.php', ['id' => $course->id]));
 } else if ($data = $form->get_data()) {
-    $mapping = $tools ? $form->get_mapping($data) : $config->mapping->restrict_to([], []);
+    // Without tools or groups there are no selects; what remains of the stored mapping is kept as far as still valid.
+    $mapping = ($tools && $groups)
+        ? $form->get_mapping($data)
+        : $config->mapping->restrict_to(array_keys($tools), array_keys($groups));
     config_repository::save(new course_config($course->id, !empty($data->enable_enrol), $mapping));
     redirect($url, get_string('changessaved'), null, \core\output\notification::NOTIFY_SUCCESS);
 }

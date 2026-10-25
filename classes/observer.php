@@ -72,8 +72,9 @@ class observer {
      * Makes failed assignments of the event path visible (course and count only, no user data).
      *
      * The enrolment itself is never affected. The failures are counted per course and shown as a
-     * warning on the settings page until a complete backfill has assigned the participants, and
-     * they are written to the web server log; developers also get a debugging message.
+     * warning on the settings page until a backfill has verified that no eligible participant misses
+     * a membership any more, and they are written to the web server log; developers also get a
+     * debugging message.
      *
      * @param int $courseid
      * @param assignment_result|null $result
