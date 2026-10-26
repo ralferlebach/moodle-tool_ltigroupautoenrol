@@ -42,7 +42,7 @@ makefile   text eol=lf
 
 # ── Distribution rules for `git archive` (the release ZIP) ───────────────────
 # The released package contains everything Moodle runs, but none of the development, CI or
-# test-harness machinery. The release-artefact job in moodle-plugin-ci-main.yml enforces this.
+# test-harness machinery. The release-artefact job in moodle-plugin-ci.yml enforces this.
 
 # Repository, IDE and CI plumbing.
 /.github                export-ignore

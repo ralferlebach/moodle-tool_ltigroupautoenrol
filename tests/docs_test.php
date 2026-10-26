@@ -19,7 +19,8 @@ namespace tool_ltigroupautoenrol;
 /**
  * Documentation smoke test: the shipped documentation matches the code it describes.
  *
- * Only files that are part of the release ZIP are checked (README.md, docs/CHANGES.md, version.php).
+ * Checks the files of the release ZIP (README.md, docs/CHANGES.md, version.php) and, in a repository
+ * checkout, the references to the CI workflows.
  *
  * @package    tool_ltigroupautoenrol
  * @category   test
@@ -45,6 +46,55 @@ final class docs_test extends \advanced_testcase {
         $this->assertStringContainsString('docs/CHANGES.md', $readme);
         $this->assertStringContainsString('supported up to Moodle 5.3', $readme);
         $this->assertSame([405, 503], $plugin->supported);
+    }
+
+    /**
+     * Every CI workflow the documentation refers to exists, and the README has a CI badge for main and development.
+     *
+     * The workflows, .gitattributes and docs/ (except CHANGES.md) are not part of the release ZIP; the test checks
+     * them in a repository checkout (the CI) and is skipped in an installed release. Historical entries of the
+     * change log may name removed workflows and are not checked.
+     */
+    public function test_workflow_references_exist(): void {
+        $dir = dirname(__DIR__);
+        $workflows = $dir . '/.github/workflows';
+        if (!is_dir($workflows)) {
+            $this->markTestSkipped('No repository checkout (release ZIP): .github/workflows is not shipped.');
+        }
+        $references = [];
+        $files = array_merge([$dir . '/README.md', $dir . '/.gitattributes'], glob($dir . '/docs/*.md') ?: []);
+        foreach ($files as $file) {
+            if (!is_file($file) || basename($file) === 'CHANGES.md') {
+                continue;
+            }
+            foreach (file($file) as $number => $line) {
+                $where = basename($file) . ':' . ($number + 1);
+                // Paths and URLs of workflows, and workflow names in comments of .gitattributes.
+                preg_match_all('~(?:\.github|actions)/workflows/([\w.-]+\.ya?ml)~', $line, $matches);
+                foreach ($matches[1] as $name) {
+                    $references[] = [$name, $where];
+                }
+                if (basename($file) === '.gitattributes' && preg_match('/^\s*#/', $line)) {
+                    preg_match_all('/([\w.-]+\.ya?ml)/', $line, $matches);
+                    foreach ($matches[1] as $name) {
+                        $references[] = [$name, $where];
+                    }
+                }
+            }
+        }
+        $this->assertNotEmpty($references);
+        foreach ($references as [$name, $where]) {
+            $this->assertFileExists("$workflows/$name", "$where refers to a workflow that does not exist");
+        }
+
+        $readme = file_get_contents($dir . '/README.md');
+        foreach (['main', 'development'] as $branch) {
+            $this->assertMatchesRegularExpression(
+                '~actions/workflows/[\w.-]+\.ya?ml/badge\.svg\?branch=' . $branch . '\)~',
+                $readme,
+                "README: CI badge of $branch"
+            );
+        }
     }
 
     /**

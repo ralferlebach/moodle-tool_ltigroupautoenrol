@@ -28,6 +28,13 @@ Rollback: Moodle does not support downgrading a plugin. Restore the database bac
 
 # Changelog
 
+## 1.2 (2026102601)
+
+Issue #24 (re-audit of 2026-10-26, commit d2b0226). No change of the plugin code, the database or the CI workflow.
+
+- The comment in .gitattributes names the existing workflow moodle-plugin-ci.yml instead of moodle-plugin-ci-main.yml (only this line changed).
+- The documentation smoke test (tests/docs_test.php) also checks, in a repository checkout, that every workflow referenced by README.md, .gitattributes (comments) and docs/ exists, and that the README has a CI badge for main (released) and development. Historical change log entries are not checked; in an installed release, where .github is not shipped, the check is skipped.
+
 ## 1.2 (2026102600)
 
 Re-audit of 2026-10-25 (commit f2314af):
