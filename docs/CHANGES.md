@@ -28,6 +28,10 @@ Rollback: Moodle does not support downgrading a plugin. Restore the database bac
 
 # Changelog
 
+## 1.2 (2026102502)
+
+- CI installation smoke test (audit A-11): `release-artefact` also builds the installable ZIP (`git archive --format=zip`, same file set as the checked archive, SHA-256 recorded) and uploads it. The new job `install-smoke` (Moodle 4.5/PostgreSQL 16/PHP 8.3 and Moodle 5.3/MariaDB 11.4/PHP 8.4) downloads exactly this ZIP, checks its SHA-256, installs it on a fresh site, requires "Database structure is ok." and runs .github/scripts/install_smoke.php: installed version, LTI enrolment assigned to the mapped group, backfill preview, backfill task, course deletion. A negative check removes a runtime class from the installed package and requires the smoke test to fail. The release gate depends on it. Every failure of the smoke script, exceptions included, is reported as a failed check with exit code 1.
+
 ## 1.2 (2026102501)
 
 - CI: the release jobs follow ralferlebach/moodle-plugintemplate: `release-artefact` (git archive, forbidden development paths, required runtime contents), `maturity-gate` (all gates incl. Playwright must be green, audit A-01) and `ci-complete` (status check for branch protection). The jobs `release-package`, `release-smoke` and `release-evidence` of 2026100901/2026102500 and the script .github/scripts/release_smoke.php are removed; the inventory check of `release-package` misread the export-ignore rules (leading "/", `docs/**` with `-export-ignore` for docs/CHANGES.md) and failed.
