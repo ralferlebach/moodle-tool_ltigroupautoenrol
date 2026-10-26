@@ -28,6 +28,10 @@ Rollback: Moodle does not support downgrading a plugin. Restore the database bac
 
 # Changelog
 
+## 1.2.0 (2026102700)
+
+Release of 1.2 on `main` (release name 1.2.0). New plugin icon (pix/icon.gif). No change of the plugin code or the database since 2026102601.
+
 ## 1.2 (2026102601)
 
 Issue #24 (re-audit of 2026-10-26, commit d2b0226). No change of the plugin code, the database or the CI workflow.
