@@ -60,13 +60,26 @@ class backfill_task extends \core\task\adhoc_task {
      */
     public static function is_pending(int $courseid): bool {
         global $DB;
-        // Filtered in the database: the custom data is the JSON written by create(), starting with the course id.
-        // Loading all queued tasks of the class would make this per-course check cost site-wide.
-        return $DB->record_exists_select(
-            'task_adhoc',
+        [$select, $params] = self::get_pending_select($courseid);
+        return $DB->record_exists_select('task_adhoc', $select, $params);
+    }
+
+    /**
+     * Returns the condition finding queued tasks of a course (also used by the benchmark in tests/load).
+     *
+     * Filtered in the database: the custom data is the JSON written by create(), starting with the course id.
+     * Queued, running (locked), retried (fail delay) and failed tasks are rows of task_adhoc until the task
+     * API deletes them after success or after the last attempt.
+     *
+     * @param int $courseid
+     * @return array{0: string, 1: array} WHERE clause for task_adhoc and its parameters.
+     */
+    public static function get_pending_select(int $courseid): array {
+        global $DB;
+        return [
             'classname = :classname AND ' . $DB->sql_like('customdata', ':customdata'),
-            ['classname' => '\\' . self::class, 'customdata' => '{"courseid":' . $courseid . ',%']
-        );
+            ['classname' => '\\' . self::class, 'customdata' => '{"courseid":' . $courseid . ',%'],
+        ];
     }
 
     /**

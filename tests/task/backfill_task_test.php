@@ -152,13 +152,22 @@ final class backfill_task_test extends \advanced_testcase {
         } finally {
             ob_end_clean();
         }
+        // Not "done": the run is incomplete and the task API retries it.
         $last = config_repository::get_last_backfill($course->id);
-        $this->assertSame([config_repository::BACKFILL_DONE, 1, 2], [$last->status, $last->added, $last->errors]);
+        $this->assertSame([config_repository::BACKFILL_PARTIAL, 1, 2], [$last->status, $last->added, $last->errors]);
 
-        // Retry: the membership exists already, nothing is duplicated.
+        // While the retry is queued, the page shows the partial result as a warning.
+        \core\task\manager::queue_adhoc_task(backfill_task::create($course->id, $config->mapping->get_hash(), time()));
+        [$message, $type] = backfill_status::get_message($course->id);
+        $this->assertSame(\core\output\notification::NOTIFY_WARNING, $type);
+        $this->assertStringContainsString('retried automatically', $message);
+
+        // Retry: the membership exists already, nothing is duplicated, and only now the run is "done".
         $this->expectOutputRegex('/"alreadymember":1/');
         backfill_task::create($course->id, $config->mapping->get_hash())->execute();
         $this->assertTrue(groups_is_member($groupid, $userid));
+        $last = config_repository::get_last_backfill($course->id);
+        $this->assertSame([config_repository::BACKFILL_DONE, 0], [$last->status, $last->errors]);
     }
 
     /**
@@ -284,5 +293,33 @@ final class backfill_task_test extends \advanced_testcase {
         // Queued courses with ids 1x must not match the site course id 1 (prefix of the JSON value).
         $this->assertGreaterThan(10, (int) end($courses)->id);
         $this->assertFalse(backfill_task::is_pending((int) SITEID));
+    }
+
+    /**
+     * A task counts as pending while it is queued, running (locked) or waiting for a retry after a failure;
+     * after it finished it is no longer pending.
+     */
+    public function test_pending_states(): void {
+        global $DB;
+        $this->resetAfterTest();
+        [$course, $tool, $groupid, , $plugingen] = $this->create_scenario();
+        $config = $plugingen->create_config($course->id, [$tool->id => [$groupid]]);
+        \core\task\manager::queue_adhoc_task(backfill_task::create($course->id, $config->mapping->get_hash(), time()));
+        $record = $DB->get_record('task_adhoc', ['classname' => '\\' . backfill_task::class], '*', MUST_EXIST);
+        $this->assertTrue(backfill_task::is_pending($course->id), 'queued');
+
+        $DB->update_record('task_adhoc', (object) ['id' => $record->id, 'timestarted' => time(), 'hostname' => 'host', 'pid' => 1]);
+        $this->assertTrue(backfill_task::is_pending($course->id), 'running (locked)');
+
+        $DB->update_record('task_adhoc', (object) [
+            'id' => $record->id, 'timestarted' => null, 'hostname' => null, 'pid' => null,
+            'faildelay' => 60, 'nextruntime' => time() + 60,
+        ]);
+        $this->assertTrue(backfill_task::is_pending($course->id), 'waiting for a retry');
+
+        $DB->set_field('task_adhoc', 'nextruntime', time() - 1, ['id' => $record->id]);
+        $this->expectOutputRegex('/"added":1/');
+        $this->runAdhocTasks(backfill_task::class);
+        $this->assertFalse(backfill_task::is_pending($course->id), 'finished');
     }
 }

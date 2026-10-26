@@ -174,16 +174,29 @@ final class assignment_service {
         if (!$groupids) {
             return 0;
         }
+        [$sql, $params] = self::get_missing_memberships_sql($courseid, $groupids, $eligiblesql, $params);
+        return $DB->count_records_sql($sql, $params);
+    }
+
+    /**
+     * Returns the query counting missing memberships (also used by the benchmark in tests/load to show its plan).
+     *
+     * @param int $courseid
+     * @param int[] $groupids Existing groups of the course (not empty).
+     * @param string $eligiblesql Subquery returning the column "userid".
+     * @param array $params Parameters of the subquery.
+     * @return array{0: string, 1: array} SQL and parameters.
+     */
+    public static function get_missing_memberships_sql(int $courseid, array $groupids, string $eligiblesql, array $params): array {
+        global $DB;
         [$insql, $inparams] = $DB->get_in_or_equal($groupids, SQL_PARAMS_NAMED, 'ltigrp');
-        return $DB->count_records_sql(
-            "SELECT COUNT(1)
-               FROM ($eligiblesql) eligible
-               JOIN {groups} g ON g.courseid = :ltigrpcourseid AND g.id $insql
-              WHERE NOT EXISTS (
-                    SELECT 1 FROM {groups_members} gm
-                     WHERE gm.groupid = g.id AND gm.userid = eligible.userid)",
-            $params + $inparams + ['ltigrpcourseid' => $courseid]
-        );
+        $sql = "SELECT COUNT(1)
+                  FROM ($eligiblesql) eligible
+                  JOIN {groups} g ON g.courseid = :ltigrpcourseid AND g.id $insql
+                 WHERE NOT EXISTS (
+                       SELECT 1 FROM {groups_members} gm
+                        WHERE gm.groupid = g.id AND gm.userid = eligible.userid)";
+        return [$sql, $params + $inparams + ['ltigrpcourseid' => $courseid]];
     }
 
     /**

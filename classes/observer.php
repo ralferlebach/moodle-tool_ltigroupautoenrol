@@ -41,8 +41,12 @@ class observer {
     /**
      * Assigns a newly LTI-enrolled user to the groups mapped to the LTI tool.
      *
-     * Triggered via core\event\user_enrolment_created. Never throws for plugin-internal
-     * problems, so an enrolment can not fail because of this plugin.
+     * Triggered via core\event\user_enrolment_created, after the enrolment is complete. This method is an error
+     * boundary: it never throws, so the enrolment can not fail because of this plugin. Core only catches
+     * exceptions of observers, not PHP errors (TypeError and the like), and reports them only as developer
+     * debugging. Here every failure is counted for the course (warning on the settings page until a backfill
+     * has verified that nothing is missing; the backfill also adds the missing memberships) and logged with
+     * course id and exception class only.
      *
      * @param user_enrolment_created $event
      * @return bool Always true.
@@ -52,20 +56,64 @@ class observer {
             // Only enrol_lti enrolments are relevant; avoids any lookup for other methods.
             return true;
         }
-        $userenrolment = $event->get_record_snapshot($event->objecttable, $event->objectid);
-        if (!$userenrolment) {
-            return true;
-        }
+        $courseid = (int) $event->courseid;
         try {
-            self::report((int) $event->courseid, assignment_service::handle_new_enrolment((int) $event->courseid, $userenrolment));
+            $userenrolment = $event->get_record_snapshot($event->objecttable, $event->objectid);
+            if (!$userenrolment) {
+                return true;
+            }
+            static::report($courseid, static::assign($courseid, $userenrolment));
         } catch (invalid_mapping_exception $e) {
             // Corrupt configuration is treated as "no mapping". No user data in the message.
-            debugging(
-                'tool_ltigroupautoenrol: invalid mapping in course ' . $event->courseid . ': ' . $e->debuginfo,
-                DEBUG_DEVELOPER
-            );
+            debugging('tool_ltigroupautoenrol: invalid mapping in course ' . $courseid . ': ' . $e->debuginfo, DEBUG_DEVELOPER);
+        } catch (\Throwable $e) {
+            static::report_failure($courseid, $e);
         }
         return true;
+    }
+
+    /**
+     * Assigns the user of a new enrolment (separate method so tests can simulate failures).
+     *
+     * @param int $courseid
+     * @param \stdClass $userenrolment user_enrolments record.
+     * @return assignment_result|null
+     */
+    protected static function assign(int $courseid, \stdClass $userenrolment): ?assignment_result {
+        return assignment_service::handle_new_enrolment($courseid, $userenrolment);
+    }
+
+    /**
+     * Records and logs an unexpected failure of the event path (course id and exception class only).
+     *
+     * The number of affected memberships is unknown, so one failure is counted. If even that can not be
+     * stored (e.g. the database is unavailable), the log line says so.
+     *
+     * @param int $courseid
+     * @param \Throwable $e
+     * @return void
+     */
+    protected static function report_failure(int $courseid, \Throwable $e): void {
+        $message = "tool_ltigroupautoenrol: assignment of a new LTI enrolment in course {$courseid} failed: " . get_class($e);
+        try {
+            static::record_failure($courseid);
+        } catch (\Throwable $persist) {
+            $message .= ' (the failure could not be recorded: ' . get_class($persist) . ')';
+        }
+        // Always logged, independent of the debugging level, so production sites see it too.
+        // phpcs:ignore moodle.PHP.ForbiddenFunctions.FoundWithAlternative
+        error_log($message);
+        debugging($message, DEBUG_NORMAL);
+    }
+
+    /**
+     * Counts one unexpected failure of the event path for the course.
+     *
+     * @param int $courseid
+     * @return void
+     */
+    protected static function record_failure(int $courseid): void {
+        config_repository::record_event_errors($courseid, 1);
     }
 
     /**

@@ -229,4 +229,31 @@ final class backup_restore_test extends \advanced_testcase {
             $this->mapping_by_name((int) $target->id)
         );
     }
+
+    /**
+     * With enrol_lti disabled on the target site, core restores the tool records without their enrolment instance;
+     * no mapping to such orphaned tools is stored.
+     */
+    public function test_restore_without_lti_instances_stores_no_orphans(): void {
+        \core\plugininfo\enrol::enable_plugin('lti', 0);
+        $newcourseid = $this->backup_and_restore(true);
+        $this->assertSame([], lti_resolver::get_course_tools($newcourseid));
+        $this->assertNull(config_repository::get($newcourseid));
+    }
+
+    /**
+     * Every tool id stored after a restore is an LTI 1.3 tool of an enrol_lti instance of the restored course.
+     */
+    public function test_restored_tools_belong_to_the_course(): void {
+        global $DB;
+        $newcourseid = $this->backup_and_restore(true);
+        foreach (array_keys(config_repository::get($newcourseid)->mapping->to_array()) as $toolid) {
+            $enrol = $DB->get_record_sql(
+                'SELECT e.* FROM {enrol_lti_tools} t JOIN {enrol} e ON e.id = t.enrolid WHERE t.id = ?',
+                [$toolid],
+                MUST_EXIST
+            );
+            $this->assertSame([(int) $newcourseid, 'lti'], [(int) $enrol->courseid, $enrol->enrol]);
+        }
+    }
 }

@@ -52,6 +52,7 @@ $string['backfill_queued'] = 'The assignment of existing LTI participants has be
 $string['backfill_run'] = 'Assign participants';
 $string['backfill_status_failed'] = 'The assignment of existing LTI participants failed on {$a->time}. The task is retried automatically; if it keeps failing, check the log of the adhoc task "Assign existing LTI participants to groups".';
 $string['backfill_status_interrupted'] = 'The assignment of existing LTI participants (last status change {$a->time}) did not finish and is no longer queued. Please check the preview and start it again.';
+$string['backfill_status_partial'] = 'Last run: {$a->time}. Added: {$a->added}, already member: {$a->alreadymember}, skipped: {$a->skipped}, errors: {$a->errors}. The memberships that could not be added are retried automatically.';
 $string['backfill_status_queued'] = 'Assignment of existing LTI participants scheduled on {$a->time}. It will be processed by the next cron run.';
 $string['backfill_status_running'] = 'Assignment of existing LTI participants is running (started {$a->time}).';
 $string['backfill_status_skipped'] = 'The assignment scheduled before {$a->time} was not carried out because the configuration was changed or disabled afterwards. Please check the preview and confirm again.';

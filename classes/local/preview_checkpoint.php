@@ -22,8 +22,8 @@ namespace tool_ltigroupautoenrol\local;
  * The preview page stores the time the preview was computed and the mapping fingerprint in the
  * user's session and only sends a random one-time token to the browser. The confirmation looks the
  * values up by token, so the approved set ("enrolments existing at preview time") can not be widened
- * by changing request parameters. A token is bound to the session and the course, expires after
- * {@see self::LIFETIME} seconds and can be used once (no replay).
+ * by changing request parameters. A token is bound to the session, the user and the course, expires
+ * after {@see self::LIFETIME} seconds and can be used once (no replay).
  *
  * @package    tool_ltigroupautoenrol
  * @copyright  2026 Ralf Erlebach
@@ -49,10 +49,16 @@ final class preview_checkpoint {
      * @return string Token (alphanumeric).
      */
     public static function create(int $courseid, string $hash, int $time): string {
-        global $SESSION;
+        global $SESSION, $USER;
         $previews = self::open_previews($time);
         $token = random_string(32);
-        $previews[$token] = ['courseid' => $courseid, 'hash' => $hash, 'time' => $time, 'expires' => $time + self::LIFETIME];
+        $previews[$token] = [
+            'courseid' => $courseid,
+            'userid' => (int) $USER->id,
+            'hash' => $hash,
+            'time' => $time,
+            'expires' => $time + self::LIFETIME,
+        ];
         $SESSION->{self::SESSION_KEY} = array_slice($previews, -self::MAX_OPEN, null, true);
         return $token;
     }
@@ -63,15 +69,15 @@ final class preview_checkpoint {
      * @param int $courseid Course of the confirmation; a token of another course is rejected.
      * @param string $token
      * @param int|null $now Defaults to time().
-     * @return \stdClass|null Object with "hash" and "time", or null if the token is unknown, used, expired
-     *     or belongs to another course.
+     * @return \stdClass|null Object with "hash" and "time", or null if the token is unknown, used, expired,
+     *     belongs to another course or was created for another user (e.g. after "log in as").
      */
     public static function consume(int $courseid, string $token, ?int $now = null): ?\stdClass {
-        global $SESSION;
+        global $SESSION, $USER;
         $now = $now ?? time();
         $previews = self::open_previews($now);
         $preview = $previews[$token] ?? null;
-        if ($preview === null || $preview['courseid'] !== $courseid) {
+        if ($preview === null || $preview['courseid'] !== $courseid || ($preview['userid'] ?? null) !== (int) $USER->id) {
             $SESSION->{self::SESSION_KEY} = $previews;
             return null;
         }
@@ -84,7 +90,7 @@ final class preview_checkpoint {
      * Returns the open, not expired previews of the session.
      *
      * @param int $now
-     * @return array<string, array{courseid: int, hash: string, time: int, expires: int}>
+     * @return array<string, array{courseid: int, userid: int, hash: string, time: int, expires: int}>
      */
     private static function open_previews(int $now): array {
         global $SESSION;

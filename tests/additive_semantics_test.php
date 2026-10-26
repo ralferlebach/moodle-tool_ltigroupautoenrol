@@ -142,4 +142,17 @@ final class additive_semantics_test extends \advanced_testcase {
         global $DB;
         return $DB->get_record('enrol', ['id' => $this->tool->enrolid], '*', MUST_EXIST);
     }
+
+    /**
+     * Suspending the LTI enrolment (or the enrolment method) keeps the membership: the plugin never revokes.
+     */
+    public function test_suspension_keeps_memberships(): void {
+        $plugin = enrol_get_plugin('lti');
+        $instance = $this->get_lti_instance();
+        $plugin->update_user_enrol($instance, $this->user->id, ENROL_USER_SUSPENDED);
+        $this->assertTrue(groups_is_member($this->groupa, $this->user->id));
+
+        $plugin->update_status($instance, ENROL_INSTANCE_DISABLED);
+        $this->assertTrue(groups_is_member($this->groupa, $this->user->id));
+    }
 }

@@ -20,7 +20,7 @@ use core\output\notification;
 use tool_ltigroupautoenrol\task\backfill_task;
 
 /**
- * Human readable status of the backfill of a course (queued, running, done, skipped, failed, interrupted).
+ * Human readable status of the backfill of a course (queued, running, done, partial, skipped, failed, interrupted).
  *
  * The settings page and the preview page show the same message, rendered as a Moodle
  * notification, which carries role="alert" for assistive technology.
@@ -43,7 +43,12 @@ final class backfill_status {
             return null;
         }
         $last->time = userdate($last->time);
-        $unfinished = [config_repository::BACKFILL_QUEUED, config_repository::BACKFILL_RUNNING, config_repository::BACKFILL_FAILED];
+        $unfinished = [
+            config_repository::BACKFILL_QUEUED,
+            config_repository::BACKFILL_RUNNING,
+            config_repository::BACKFILL_FAILED,
+            config_repository::BACKFILL_PARTIAL,
+        ];
         if (in_array($last->status, $unfinished, true) && !backfill_task::is_pending($courseid)) {
             // The task is gone (removed or given up after its retries) without recording a result.
             return [get_string('backfill_status_interrupted', 'tool_ltigroupautoenrol', $last), notification::NOTIFY_ERROR];
@@ -55,6 +60,8 @@ final class backfill_status {
                 return [get_string('backfill_status_running', 'tool_ltigroupautoenrol', $last), notification::NOTIFY_INFO];
             case config_repository::BACKFILL_FAILED:
                 return [get_string('backfill_status_failed', 'tool_ltigroupautoenrol', $last), notification::NOTIFY_WARNING];
+            case config_repository::BACKFILL_PARTIAL:
+                return [get_string('backfill_status_partial', 'tool_ltigroupautoenrol', $last), notification::NOTIFY_WARNING];
             case config_repository::BACKFILL_SKIPPED:
                 return [get_string('backfill_status_skipped', 'tool_ltigroupautoenrol', $last), notification::NOTIFY_WARNING];
             default:

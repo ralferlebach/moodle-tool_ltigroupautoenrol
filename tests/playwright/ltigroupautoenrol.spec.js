@@ -242,4 +242,76 @@ test.describe('tool_ltigroupautoenrol', () => {
       await expect(page.locator('form#mform1, [name="enable_enrol"]')).toHaveCount(0);
     }
   });
+
+  test('backfill: a confirmation can not be replayed or forged', async ({ page }) => {
+    const courseid = env('LTIGAE_BACKFILL_COURSE');
+    resetBackfillCourse(courseid);
+    await open(page, backfillUrl(courseid));
+    const confirm = page.getByRole('button', { name: 'Assign participants' });
+    const form = page.locator('form').filter({ has: confirm });
+    const action = await form.getAttribute('action');
+    const fields = {};
+    for (const input of await form.locator('input[type="hidden"]').all()) {
+      fields[await input.getAttribute('name')] = await input.inputValue();
+    }
+    expect(fields.token).toMatch(/^[A-Za-z0-9]{32}$/);
+    expect(Object.keys(fields)).not.toContain('previewtime');
+    await confirm.click();
+    await expect(page.locator('#region-main')).toContainText('has been scheduled');
+
+    // Without the queued task, a replayed or forged confirmation would queue a new run - it must not.
+    resetBackfillCourse(courseid);
+    for (const token of [fields.token, 'forgedTokenForgedTokenForgedToke']) {
+      const response = await page.request.post(action, { form: { ...fields, token } });
+      expect(response.status()).toBe(200);
+      expect(await response.text()).toContain('The preview has expired or was already confirmed.');
+    }
+    await open(page, backfillUrl(courseid));
+    await expect(page.locator('#region-main')).toContainText('Group memberships to be added: 1.');
+    await expect(page.locator('#region-main')).not.toContainText('already scheduled');
+    resetBackfillCourse(courseid);
+  });
+
+  test('backfill: a second confirmation while a run is queued says so', async ({ page, context }) => {
+    const courseid = env('LTIGAE_BACKFILL_COURSE');
+    resetBackfillCourse(courseid);
+    const second = await context.newPage();
+    await open(page, backfillUrl(courseid));
+    await open(second, backfillUrl(courseid));
+
+    await page.getByRole('button', { name: 'Assign participants' }).click();
+    await expect(page.locator('#region-main')).toContainText('has been scheduled');
+    await second.getByRole('button', { name: 'Assign participants' }).click();
+    await second.waitForLoadState('domcontentloaded');
+    await expect(second.locator('#region-main')).toContainText(
+      'An assignment run for this course is already scheduled. It will be processed by the next cron run.'
+    );
+    await expect(second.locator('#region-main')).not.toContainText('has been scheduled and will be processed');
+    await expectAccessible(second, 'pending message');
+    await second.close();
+    resetBackfillCourse(courseid);
+  });
+
+  test('settings: a group select of a foreign LTI tool is rejected', async ({ page }) => {
+    await open(page, settingsUrl(env('LTIGAE_COURSE')));
+    // A manipulated request: a select for a tool id that is not offered for this course.
+    await page.evaluate(() => {
+      const form = document.querySelector('form.mform');
+      const select = document.createElement('select');
+      select.name = 'groups_999999[]';
+      select.multiple = true;
+      select.hidden = true;
+      const option = document.createElement('option');
+      option.value = '1';
+      option.selected = true;
+      select.appendChild(option);
+      form.appendChild(select);
+    });
+    await page.getByRole('button', { name: 'Save changes' }).click();
+    await page.waitForLoadState('domcontentloaded');
+    await expect(page.locator('#region-main')).toContainText(
+      'The form contained an LTI tool that does not belong to this course. Please reload the page and save again.'
+    );
+    await expect(page.locator('#region-main')).not.toContainText('Changes saved');
+  });
 });

@@ -28,6 +28,22 @@ Rollback: Moodle does not support downgrading a plugin. Restore the database bac
 
 # Changelog
 
+## 1.2 (2026102600)
+
+Re-audit of 2026-10-25 (commit f2314af):
+
+- #15/N-01: a backfill run with failed memberships records the new status "partial" (shown as a warning with the counters, retried automatically) instead of "done"; "done" only after a complete run. A partial run whose task is no longer queued is shown as interrupted.
+- N-02: the enrolment observer is an error boundary. Core catches only exceptions of observers (not PHP errors such as TypeError) and reports them as developer debugging only; now every failure, including PHP errors, is caught, counted for the course (warning on the settings page, repaired by a backfill) and logged with course id and exception class. If even counting fails, the log says so. Integration tests run a real LTI enrolment with forced failures (database exception, PHP error, coding exception, failing status persistence).
+- #13: tests for atomic counting, the one-second resolution of the clearing and the race window between check and clearing.
+- #14: the preview token is also bound to the user (e.g. "log in as" in the same session); tests for another user and a new session; Playwright: a replayed and a forged confirmation are rejected in the browser, the button carries only the token.
+- #16: restored LTI tools are accepted only if they belong to an enrol_lti instance of the restored course (whatever the order of the after_restore methods); no mapping to orphaned tools (e.g. enrol_lti disabled on the target site).
+- #17/#18: pending check and preview are measured for 1/100/1000 queued tasks and 1/10/100/1000 groups on PostgreSQL and MariaDB (docs/performance.md, tests/load/benchmark.php); PHPUnit enforces constant query counts (tests/local/scaling_test.php). Tests for queued, running, retried and finished tasks.
+- #20: Playwright: a second confirmation in another tab while a run is queued shows the "already scheduled" message.
+- #21: test that suspending an LTI enrolment or the enrolment method keeps the membership (additive semantics).
+- #22: the upgrade test upgrades to exactly the candidate ZIP (SHA-256 checked) instead of the checkout.
+- #23: test for duplicate group ids; Playwright: a manipulated group select of a foreign tool is rejected in the browser; README documents the validation and why parameters of versions up to 1.1 are ignored.
+- #12: fail-closed gate script with self-test job; the ZIP is published as release artifact only after the gate; release contract in the README.
+
 ## 1.2 (2026102502)
 
 - CI installation smoke test (audit A-11): `release-artefact` also builds the installable ZIP (`git archive --format=zip`, same file set as the checked archive, SHA-256 recorded) and uploads it. The new job `install-smoke` (Moodle 4.5/PostgreSQL 16/PHP 8.3 and Moodle 5.3/MariaDB 11.4/PHP 8.4) downloads exactly this ZIP, checks its SHA-256, installs it on a fresh site, requires "Database structure is ok." and runs .github/scripts/install_smoke.php: installed version, LTI enrolment assigned to the mapped group, backfill preview, backfill task, course deletion. A negative check removes a runtime class from the installed package and requires the smoke test to fail. The release gate depends on it. Every failure of the smoke script, exceptions included, is reported as a failed check with exit code 1.

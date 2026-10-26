@@ -200,4 +200,25 @@ final class backfill_controller_test extends \advanced_testcase {
             $this->assertSame(\core\output\notification::NOTIFY_ERROR, $type);
         }
     }
+
+    /**
+     * A token is bound to the user and the session: another user (e.g. "log in as") or a new session can not use it.
+     */
+    public function test_token_is_bound_to_user_and_session(): void {
+        global $SESSION;
+        $hash = $this->config->mapping->get_hash();
+        $teacher = $this->getDataGenerator()->create_user();
+        $other = $this->getDataGenerator()->create_user();
+
+        $this->setUser($teacher);
+        $token = preview_checkpoint::create($this->course->id, $hash, 1000);
+        $this->setUser($other);
+        $this->assertSame(backfill_controller::EXPIRED, backfill_controller::confirm_token($this->course->id, $token, 1100));
+
+        $this->setUser($teacher);
+        $token = preview_checkpoint::create($this->course->id, $hash, 1000);
+        $SESSION = new \stdClass();
+        $this->assertSame(backfill_controller::EXPIRED, backfill_controller::confirm_token($this->course->id, $token, 1100));
+        $this->assertCount(0, \core\task\manager::get_adhoc_tasks(backfill_task::class));
+    }
 }

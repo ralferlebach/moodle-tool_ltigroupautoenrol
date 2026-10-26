@@ -52,6 +52,7 @@ $string['backfill_queued'] = 'Die Zuordnung bestehender LTI-Teilnehmender wurde 
 $string['backfill_run'] = 'Teilnehmende zuordnen';
 $string['backfill_status_failed'] = 'Die Zuordnung bestehender LTI-Teilnehmender ist am {$a->time} fehlgeschlagen. Die Aufgabe wird automatisch wiederholt; schlägt sie weiter fehl, prüfen Sie das Protokoll der Ad-hoc-Aufgabe „Bestehende LTI-Teilnehmende Gruppen zuordnen“.';
 $string['backfill_status_interrupted'] = 'Die Zuordnung bestehender LTI-Teilnehmender (letzte Statusänderung {$a->time}) wurde nicht abgeschlossen und ist nicht mehr eingeplant. Bitte prüfen Sie die Vorschau und starten Sie sie erneut.';
+$string['backfill_status_partial'] = 'Letzter Lauf: {$a->time}. Hinzugefügt: {$a->added}, bereits Mitglied: {$a->alreadymember}, übersprungen: {$a->skipped}, Fehler: {$a->errors}. Die nicht hinzugefügten Mitgliedschaften werden automatisch erneut versucht.';
 $string['backfill_status_queued'] = 'Zuordnung bestehender LTI-Teilnehmender am {$a->time} eingeplant. Sie wird beim nächsten Cron-Lauf verarbeitet.';
 $string['backfill_status_running'] = 'Zuordnung bestehender LTI-Teilnehmender läuft (gestartet {$a->time}).';
 $string['backfill_status_skipped'] = 'Die vor {$a->time} eingeplante Zuordnung wurde nicht ausgeführt, weil die Konfiguration danach geändert oder deaktiviert wurde. Bitte prüfen Sie die Vorschau und bestätigen Sie erneut.';

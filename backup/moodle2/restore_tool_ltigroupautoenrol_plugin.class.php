@@ -81,14 +81,14 @@ class restore_tool_ltigroupautoenrol_plugin extends restore_tool_plugin {
             // A corrupt mapping in the backup is not restored.
             return;
         }
-        // Tool ids come from the restore mapping of enrol_lti, so they are tools of this restore. Their link to the
-        // restored enrolment instance is only set by enrol_lti's own after_restore, which may run after this method,
-        // so the tools are not looked up through the course here.
+        // Tool ids come from the restore mapping of enrol_lti; each must also belong to an LTI enrolment instance of
+        // the restored course (see tool_belongs_to_course()), so no tool of another course or without an instance
+        // is stored.
         $coursegroups = groups_get_all_groups($courseid);
         $translated = [];
         foreach ($source->to_array() as $oldtoolid => $oldgroupids) {
             $toolid = (int) $this->get_mappingid('enrol_lti_tool', $oldtoolid);
-            if (!$toolid || !$DB->record_exists('enrol_lti_tools', ['id' => $toolid])) {
+            if (!$toolid || !$this->tool_belongs_to_course($toolid, $courseid)) {
                 continue;
             }
             foreach ($oldgroupids as $oldgroupid) {
@@ -116,5 +116,28 @@ class restore_tool_ltigroupautoenrol_plugin extends restore_tool_plugin {
             return;
         }
         config_repository::save(new course_config($courseid, !empty($this->restoredconfig->enable_enrol), $restored));
+    }
+
+    /**
+     * Whether a restored LTI tool belongs to an LTI enrolment instance of the restored course.
+     *
+     * enrol_lti links its restored tools to the restored enrolment instances in its own after_restore method.
+     * Depending on the order of the after_restore methods, the tool still carries the enrolment id of the backup
+     * (translated through the restore mapping "enrol") or already the new one; both are accepted, but only if
+     * the instance is an enrol_lti instance of this course. Tools whose instance was not restored (e.g. enrol_lti
+     * disabled on the target site) are rejected.
+     *
+     * @param int $toolid
+     * @param int $courseid
+     * @return bool
+     */
+    protected function tool_belongs_to_course(int $toolid, int $courseid): bool {
+        global $DB;
+        $tool = $DB->get_record('enrol_lti_tools', ['id' => $toolid], 'id, enrolid');
+        if (!$tool || empty($tool->enrolid)) {
+            return false;
+        }
+        $enrolid = (int) $this->get_mappingid('enrol', $tool->enrolid) ?: (int) $tool->enrolid;
+        return $DB->record_exists('enrol', ['id' => $enrolid, 'courseid' => $courseid, 'enrol' => 'lti']);
     }
 }

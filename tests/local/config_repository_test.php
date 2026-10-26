@@ -118,4 +118,75 @@ final class config_repository_test extends \advanced_testcase {
         $this->expectException(invalid_mapping_exception::class);
         config_repository::get($course->id);
     }
+
+    /**
+     * Failure counting is a single atomic UPDATE: increments add up, the first and the last failure time are kept.
+     */
+    public function test_event_error_counting_is_cumulative(): void {
+        global $DB;
+        $this->resetAfterTest();
+        $courseid = (int) $this->getDataGenerator()->create_course()->id;
+        config_repository::save(course_config::create_default($courseid));
+
+        config_repository::record_event_errors($courseid, 2, 2000);
+        config_repository::record_event_errors($courseid, 1, 1000);
+        config_repository::record_event_errors($courseid, 3, 3000);
+        config_repository::record_event_errors($courseid, 0, 9000);
+
+        $record = $DB->get_record('tool_ltigroupautoenrol', ['courseid' => $courseid]);
+        $this->assertEquals([6, 2000, 3000], [$record->event_errors, $record->event_errortime, $record->event_errorlast]);
+    }
+
+    /**
+     * Clearing keeps every failure recorded in the same second as the check or later (one-second resolution),
+     * so a failure that happens while the check runs is never lost; only earlier failures are cleared.
+     *
+     * @dataProvider clear_provider
+     * @param int $lastfailure Time of the last failure.
+     * @param int $checktime Time taken before the check.
+     * @param bool $cleared
+     */
+    public function test_clear_event_errors_boundaries(int $lastfailure, int $checktime, bool $cleared): void {
+        $this->resetAfterTest();
+        $courseid = (int) $this->getDataGenerator()->create_course()->id;
+        config_repository::save(course_config::create_default($courseid));
+        config_repository::record_event_errors($courseid, 1, 1000);
+        config_repository::record_event_errors($courseid, 1, $lastfailure);
+
+        config_repository::clear_event_errors($courseid, $checktime);
+
+        $this->assertSame($cleared, config_repository::get_event_errors($courseid) === null);
+    }
+
+    /**
+     * Cases for {@see test_clear_event_errors_boundaries()}.
+     *
+     * @return array
+     */
+    public static function clear_provider(): array {
+        return [
+            'last failure before the check' => [1999, 2000, true],
+            'last failure in the same second as the check' => [2000, 2000, false],
+            'failure during or after the check' => [2001, 2000, false],
+        ];
+    }
+
+    /**
+     * A failure recorded after the check but before the clearing statement (the race window) survives the clearing.
+     */
+    public function test_failure_in_race_window_survives(): void {
+        $this->resetAfterTest();
+        $courseid = (int) $this->getDataGenerator()->create_course()->id;
+        config_repository::save(course_config::create_default($courseid));
+        config_repository::record_event_errors($courseid, 1, 1000);
+
+        $checktime = 2000;
+        // The check found nothing missing; meanwhile the observer fails for a new enrolment.
+        config_repository::record_event_errors($courseid, 1, $checktime + 1);
+        config_repository::clear_event_errors($courseid, $checktime);
+
+        $errors = config_repository::get_event_errors($courseid);
+        $this->assertNotNull($errors);
+        $this->assertSame(2, $errors->count);
+    }
 }

@@ -7,11 +7,14 @@
 #   4. upgrade and require: schema identical to a fresh install (check_database_schema), one row per
 #      course with the oldest row's mapping in canonical form, unique key present, every removed row backed up.
 #
-# Usage: upgrade_e2e.sh <moodle dir> <plugin git checkout with full history>
-# config.php of <moodle dir> must point to an empty database and an empty dataroot.
+# Usage: upgrade_e2e.sh <moodle dir> <plugin git checkout with full history> [<new plugin code>]
+# <new plugin code> is the directory of the code to upgrade to, e.g. the unpacked release ZIP (CI);
+# without it, the checkout itself is used. config.php of <moodle dir> must point to an empty database
+# and an empty dataroot.
 set -euo pipefail
 M=$(cd "$1" && pwd)
 SRC=$(cd "$2" && pwd)
+NEW=$(cd "${3:-$2}" && pwd)
 BASELINE=fd456f3
 if [ -d "$M/public" ]; then P="$M/public/admin/tool/ltigroupautoenrol"; else P="$M/admin/tool/ltigroupautoenrol"; fi
 cd "$M"
@@ -47,7 +50,8 @@ PHP
 
 echo "== New code and read-only pre-upgrade check"
 rm -rf "$P"; mkdir -p "$P"
-tar -C "$SRC" --exclude=.git --exclude=node_modules -cf - . | tar -C "$P" -xf -
+echo "new code from: $NEW"
+tar -C "$NEW" --exclude=.git --exclude=node_modules -cf - . | tar -C "$P" -xf -
 php "$P/cli/check_upgrade.php" | tee "$tmp/check.log"
 grep -q "Configurations of deleted courses (will be backed up and removed): 1" "$tmp/check.log"
 grep -q "rows to be backed up and removed: 1" "$tmp/check.log"
@@ -58,7 +62,7 @@ echo "== Upgrade"
 php admin/cli/upgrade.php --non-interactive > "$tmp/upgrade.log" 2>&1 || { tail -n 40 "$tmp/upgrade.log"; exit 1; }
 grep "tool_ltigroupautoenrol:" "$tmp/upgrade.log" || true
 upgraded=$(php admin/cli/cfg.php --component=tool_ltigroupautoenrol --name=version)
-current=$(sed -n 's/.*\$plugin->version *= *\([0-9]*\).*/\1/p' "$SRC/version.php")
+current=$(sed -n 's/.*\$plugin->version *= *\([0-9]*\).*/\1/p' "$NEW/version.php")
 echo "upgraded version: $upgraded"
 [ "$upgraded" = "$current" ]
 

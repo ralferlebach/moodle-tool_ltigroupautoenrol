@@ -138,6 +138,8 @@ jobs:
     # Real site upgrade from the published 1.0.1 (identical to git fd456f3) following docs/CHANGES.md:
     # install 1.0.1, store duplicate and orphaned configurations, run the read-only check, upgrade, then
     # require "Database structure is ok." and the expected data and backups (tests/upgrade/upgrade_e2e.sh).
+    # The code upgraded to is exactly the candidate ZIP of release-artefact (SHA-256 checked), not the checkout.
+    needs: release-artefact
     runs-on: ubuntu-22.04
 
     services:
@@ -212,8 +214,21 @@ jobs:
           sed -i 's/^          //' moodle/config.php
           php -l moodle/config.php
 
-      - name: Upgrade from the published 1.0.1
-        run: bash plugin/tests/upgrade/upgrade_e2e.sh moodle plugin
+      - name: Download and unpack the candidate ZIP
+        uses: actions/download-artifact@v4
+        with:
+          name: candidate-tool_ltigroupautoenrol-${{ github.sha }}
+          path: release
+
+      - name: Verify the ZIP bytes and unpack them
+        run: |
+          test "$(sha256sum 'release/${{ needs.release-artefact.outputs.zip }}' | cut -d' ' -f1)" = '${{ needs.release-artefact.outputs.sha256 }}'
+          mkdir -p zipcode
+          unzip -q "release/${{ needs.release-artefact.outputs.zip }}" -d zipcode
+          test -f zipcode/ltigroupautoenrol/version.php
+
+      - name: Upgrade from the published 1.0.1 to the candidate ZIP
+        run: bash plugin/tests/upgrade/upgrade_e2e.sh moodle plugin zipcode/ltigroupautoenrol
 
   playwright:
     # Browser tests (page identity, axe WCAG 2.1 A/AA, keyboard and focus, reflow, German UI, access denial)
@@ -401,10 +416,10 @@ jobs:
           echo "sha256=$sha" >> "$GITHUB_OUTPUT"
           echo "ZIP $zip, SHA-256 $sha, commit $GITHUB_SHA" | tee -a "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload the installable ZIP
+      - name: Upload the candidate ZIP (released only by the release gate)
         uses: actions/upload-artifact@v4
         with:
-          name: tool_ltigroupautoenrol-${{ github.sha }}
+          name: candidate-tool_ltigroupautoenrol-${{ github.sha }}
           path: |
             ${{ steps.zip.outputs.zip }}
             ${{ steps.zip.outputs.zip }}.sha256
@@ -449,10 +464,10 @@ jobs:
         with:
           path: plugin
 
-      - name: Download the installable ZIP
+      - name: Download the candidate ZIP
         uses: actions/download-artifact@v4
         with:
-          name: tool_ltigroupautoenrol-${{ github.sha }}
+          name: candidate-tool_ltigroupautoenrol-${{ github.sha }}
           path: release
 
       - name: Verify the ZIP bytes
@@ -510,10 +525,37 @@ jobs:
           fi
           echo "Missing runtime file detected as expected."
 
+  gate-selftest:
+    name: Release gate self-test
+    # Fail-closed proof of the gate logic (.github/scripts/release_gate.sh): every result other than "success",
+    # a missing result and an empty list must fail the gate; only all-green passes.
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check out plugin
+        uses: actions/checkout@v4
+
+      - name: Gate logic fails closed
+        run: |
+          gate=.github/scripts/release_gate.sh
+          expect() {
+            local want=$1; shift
+            if bash "$gate" "$@" > /dev/null; then got=pass; else got=fail; fi
+            echo "$want <- $got: $*"
+            [ "$want" = "$got" ]
+          }
+          expect pass test=success playwright=success
+          expect fail test=success playwright=failure
+          expect fail test=success playwright=cancelled
+          expect fail test=success playwright=skipped
+          expect fail test=success playwright=
+          expect fail test=success playwright
+          expect fail
+
   maturity-gate:
     name: Release gate
-    # Single place where the release gates are judged; Playwright is one of them (audit A-01).
-    needs: [test, upgrade-e2e, playwright, release-artefact, install-smoke]
+    # Single place where the release gates are judged; Playwright is one of them (audit A-01). Only if every
+    # gate is green, the candidate ZIP is published as the release artifact of the run.
+    needs: [test, upgrade-e2e, playwright, release-artefact, install-smoke, gate-selftest]
     runs-on: ubuntu-22.04
     # Without always() this job is skipped when a dependency fails, and a skipped job is not re-run by
     # "re-run failed jobs".
@@ -524,25 +566,38 @@ jobs:
 
       - name: Every release gate must be green
         run: |
-          rc=0
-          for entry in \
-              "test=${{ needs.test.result }}" \
-              "upgrade-e2e=${{ needs.upgrade-e2e.result }}" \
-              "playwright=${{ needs.playwright.result }}" \
-              "release-artefact=${{ needs.release-artefact.result }}" \
-              "install-smoke=${{ needs.install-smoke.result }}"; do
-            echo "  ${entry%%=*}: ${entry#*=}"
-            if [[ "${entry#*=}" != "success" ]]; then
-              rc=1
-            fi
-          done
-          if [[ $rc -ne 0 ]]; then
-            echo "Mindestens ein Release-Gate ist nicht gruen (siehe Liste oben)."
-            exit 1
-          fi
+          bash .github/scripts/release_gate.sh \
+            "test=${{ needs.test.result }}" \
+            "upgrade-e2e=${{ needs.upgrade-e2e.result }}" \
+            "playwright=${{ needs.playwright.result }}" \
+            "release-artefact=${{ needs.release-artefact.result }}" \
+            "install-smoke=${{ needs.install-smoke.result }}" \
+            "gate-selftest=${{ needs.gate-selftest.result }}"
           maturity=$(grep -oE 'MATURITY_[A-Z]+' version.php | head -1)
           echo "Deklarierter Reifegrad: ${maturity:-unbekannt}"
-          echo "Alle Release-Gates sind gruen."
+
+      - name: Download the candidate ZIP
+        uses: actions/download-artifact@v4
+        with:
+          name: candidate-tool_ltigroupautoenrol-${{ github.sha }}
+          path: release
+
+      - name: Check the candidate bytes once more
+        run: |
+          test "$(sha256sum 'release/${{ needs.release-artefact.outputs.zip }}' | cut -d' ' -f1)" = '${{ needs.release-artefact.outputs.sha256 }}'
+          {
+            echo "### Release"
+            echo "- Commit: \`$GITHUB_SHA\`"
+            echo "- ZIP: \`${{ needs.release-artefact.outputs.zip }}\`"
+            echo "- SHA-256: \`${{ needs.release-artefact.outputs.sha256 }}\`"
+            echo "- All gates green; published as artifact tool_ltigroupautoenrol-$GITHUB_SHA"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish the released ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: tool_ltigroupautoenrol-${{ github.sha }}
+          path: release/
 
   ci-complete:
     name: CI complete
@@ -550,11 +605,8 @@ jobs:
     runs-on: ubuntu-22.04
     if: always()
     steps:
+      - name: Check out plugin
+        uses: actions/checkout@v4
+
       - name: All gates must have succeeded
-        run: |
-          echo "  maturity-gate: ${{ needs.maturity-gate.result }}"
-          if [[ "${{ needs.maturity-gate.result }}" != "success" ]]; then
-            echo "Mindestens ein Gate ist nicht gruen (siehe Release gate)."
-            exit 1
-          fi
-          echo "All CI gates passed."
+        run: bash .github/scripts/release_gate.sh "maturity-gate=${{ needs.maturity-gate.result }}"

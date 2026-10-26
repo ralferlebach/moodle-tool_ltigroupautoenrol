@@ -251,4 +251,17 @@ final class manage_form_test extends \advanced_testcase {
         $this->assertNotNull($data);
         $this->assertSame('0', (string) $data->enable_enrol);
     }
+
+    /**
+     * Duplicate group ids in a submission are stored once.
+     */
+    public function test_duplicate_group_ids_are_stored_once(): void {
+        $form = $this->submit([
+            'enable_enrol' => 1,
+            'groups_' . $this->tool->id => [$this->group, $this->group, (string) $this->group],
+        ]);
+        $data = $form->get_data();
+        $this->assertNotNull($data);
+        $this->assertSame([(int) $this->tool->id => [(int) $this->group]], $form->get_mapping($data)->to_array());
+    }
 }

@@ -146,6 +146,9 @@ final class config_repository {
     /** @var string Backfill status: the run failed with an exception; the task API retries it. */
     public const BACKFILL_FAILED = 'failed';
 
+    /** @var string Backfill status: the run finished, but some memberships could not be added; the task API retries it. */
+    public const BACKFILL_PARTIAL = 'partial';
+
     /**
      * Records the status of the backfill of a course (status, time, counters; no user data).
      *
@@ -183,7 +186,8 @@ final class config_repository {
      * @return void
      */
     public static function record_backfill(int $courseid, assignment_result $result, ?int $time = null): void {
-        self::record_backfill_status($courseid, self::BACKFILL_DONE, $result, $time);
+        // Status done only for a complete run; with failed memberships the task fails and is retried.
+        self::record_backfill_status($courseid, $result->errors > 0 ? self::BACKFILL_PARTIAL : self::BACKFILL_DONE, $result, $time);
     }
 
     /**
@@ -266,6 +270,7 @@ final class config_repository {
         }
         $statuses = [
             self::BACKFILL_QUEUED, self::BACKFILL_RUNNING, self::BACKFILL_DONE, self::BACKFILL_SKIPPED, self::BACKFILL_FAILED,
+            self::BACKFILL_PARTIAL,
         ];
         $status = in_array($data['status'] ?? null, $statuses, true) ? $data['status'] : self::BACKFILL_DONE;
         return (object) (['status' => $status, 'time' => (int) $record->backfill_time] + $counters->to_array());
