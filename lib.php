@@ -26,28 +26,34 @@
 /**
  * Extend the navigation for course.
  *
+ * The link is shown in the "Users" node of real courses (not the site course) and only to users
+ * who hold tool/ltigroupautoenrol:manage, the same capability the target page requires.
+ *
  * @param navigation_node $navigation
- * @param object $course
+ * @param stdClass $course
  * @param context $context
  *
  * @return void
  */
-function tool_ltigroupautoenrol_extend_navigation_course(navigation_node $navigation, object $course, context $context): void {
-
-    if (!($context instanceof context_course || $context instanceof context_module) && empty($context->instanceid)) {
+function tool_ltigroupautoenrol_extend_navigation_course(navigation_node $navigation, stdClass $course, context $context): void {
+    if (!$context instanceof context_course || (int) $context->instanceid !== (int) $course->id) {
+        return;
+    }
+    if (!\tool_ltigroupautoenrol\local\access::can_manage($course)) {
         return;
     }
 
-    if (!has_capability("moodle/course:managegroups", $context)) {
-        return;
-    }
-
-    // Add link to manage automatic group enrolment.
-    $url = new moodle_url(
-        '/admin/tool/ltigroupautoenrol/manage_lti_group_auto_enrol.php',
-        ['id' => $context->instanceid]
-    );
     $usermenu = $navigation->get('users');
+    if (!$usermenu) {
+        return;
+    }
 
-    $usermenu->add(get_string('menu_auto_groups', 'tool_ltigroupautoenrol'), $url);
+    $url = new moodle_url('/admin/tool/ltigroupautoenrol/manage_lti_group_auto_enrol.php', ['id' => $course->id]);
+    $usermenu->add(
+        get_string('menu_auto_groups', 'tool_ltigroupautoenrol'),
+        $url,
+        navigation_node::TYPE_SETTING,
+        null,
+        'tool_ltigroupautoenrol'
+    );
 }

@@ -30,4 +30,16 @@ $observers = [
         'eventname' => '\core\event\user_enrolment_created',
         'callback' => '\tool_ltigroupautoenrol\observer::user_is_enrolled',
     ],
+    [
+        'eventname' => '\core\event\course_deleted',
+        'callback' => '\tool_ltigroupautoenrol\observer::course_deleted',
+    ],
+    [
+        'eventname' => '\core\event\enrol_instance_deleted',
+        'callback' => '\tool_ltigroupautoenrol\observer::enrol_instance_deleted',
+    ],
+    [
+        'eventname' => '\core\event\group_deleted',
+        'callback' => '\tool_ltigroupautoenrol\observer::group_deleted',
+    ],
 ];

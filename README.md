@@ -1,38 +1,207 @@
-# Moodle-admin_tool_ltigroupautoenrol
+moodle-tool_ltigroupautoenrol
+=============================
 
-Version 1.1 (stable version) for Moodle 4.5 onwards
+[![Moodle Plugin CI (main, released)](https://github.com/ralferlebach/moodle-tool_ltigroupautoenrol/actions/workflows/moodle-plugin-ci.yml/badge.svg?branch=main)](https://github.com/ralferlebach/moodle-tool_ltigroupautoenrol/actions/workflows/moodle-plugin-ci.yml?query=branch%3Amain)
+[![Moodle Plugin CI (development)](https://github.com/ralferlebach/moodle-tool_ltigroupautoenrol/actions/workflows/moodle-plugin-ci.yml/badge.svg?branch=development)](https://github.com/ralferlebach/moodle-tool_ltigroupautoenrol/actions/workflows/moodle-plugin-ci.yml?query=branch%3Adevelopment)
 
-Plugin to automatically enrol users to pre-defined group(s) when enroling in a course that is shared via LTI. This allows moodle administrators and teachers who act as LTI providers to only maintain one course but differentiating the users coming from different consumers.
+Branches: `main` holds the released version, `development` the next one.
 
-This plugin is derived from tool_groupautoenrol plugin.
+Moodle admin tool plugin which automatically adds users to pre-defined groups when they are enrolled in a course through an LTI 1.3 tool. The groups are chosen per LTI tool, so one course can serve several LTI consumers and still put their users into separate groups (additive; see "How this plugin works / Pitfalls").
 
-## Things to know :
-- The plugin uses \core\event\user_enrolment_created (user_enrolled) Moodle event
-- If a selected group is deleted, the plugin will ignore it.
 
-## In this stable version (1.1) :
-- GDPR implementation
-- you can choose to enable the plugin in each course
-- you can choose to auto-enrol students in one or more groups each LTI tool deployment#
-- (only) works with LTI 1.3 Advance
-- automated CI testing
+Requirements
+------------
 
-## Compatibility :
-- Tested with Moodle 4.5 and LTI 1.3 Advance
+This plugin requires Moodle 4.5+ and is supported up to Moodle 5.3.
 
-# Installation
-* Copy the directory 'ltigroupautoenrol' into the `moodledir/admin/tool` directory.
-* Connect to moodle as an administrator and install the plugin.
-* Go to a course, create at least one group
-* Enable the plugin for the course with the new link "Course administration > Users > LTI-enrol in groups"
-Note : this link appears even if the plugin is not enabled for the course
+It works with LTI 1.3 (LTI Advantage) tools published by Moodle's "Publish as LTI tool" enrolment method (enrol_lti). LTI 1.1 tools are ignored.
 
-# License
-* @copyright  2026 Ralf Erlebach
-* @author     Ralf Erlebach -https://github.com/ralferlebach
 
-This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+Motivation for this plugin
+--------------------------
 
-This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+Teachers and administrators who act as LTI providers often share one course with several consumers, for example different universities or schools. Without this plugin, all users coming from all consumers end up in the same, undivided course. With this plugin, the course is maintained only once, while the users of every consumer are separated into their own groups automatically.
 
-You should have received a copy of the GNU General Public License along with this program. If not, see https://www.gnu.org/licenses/.
+This plugin is derived from tool_groupautoenrol by Pascal M.
+
+
+Installation
+------------
+
+Install the plugin like any other plugin to folder
+/admin/tool/ltigroupautoenrol (Moodle 4.5 and 5.0) or
+/public/admin/tool/ltigroupautoenrol (Moodle 5.1 and later)
+
+See http://docs.moodle.org/en/Installing_plugins for details on installing Moodle plugins
+
+Upgrading from an earlier version of this plugin: please read the upgrade notes in docs/CHANGES.md first (backup, read-only pre-upgrade check, rollback).
+
+
+Usage & Settings
+----------------
+
+After installing the plugin, it does not do anything to Moodle yet. It is configured per course; there are no site-wide settings.
+
+To configure the plugin for a course:
+
+1. Create at least one group in the course.
+2. Publish the course or an activity as LTI 1.3 tool: Course administration -> Users -> Enrolment methods -> Publish as LTI tool.
+3. Open Course administration -> Users -> LTI-enrol in groups.
+
+There, you find these settings:
+
+* **Enable automatic enrolment in groups for this course** - Switches the automatic group assignment for this course on or off. Switching it off keeps the selected groups. The switch is also available when the course has no groups or no LTI tools.
+* **Groups for LTI tool: [tool]** - One multi-select per LTI 1.3 tool of the course. Users enrolled through this tool are added to the selected groups.
+
+Validation of the settings form (server side, independent of the browser): only groups of the course can be selected; a group select of an LTI tool that does not belong to the course (foreign, deleted or invented id) is rejected with an error; duplicate group ids are stored once. Request parameters of versions up to 1.1 (`ltitoolcount`, `ltitoolid_*`, `groupslist_*`) are ignored on purpose: the form has no such elements any more, so they can not address anything and are not reported.
+
+Participants who were enrolled before the configuration was saved can be assigned afterwards with **Assign existing LTI participants …**. The page shows a preview per LTI tool (active LTI enrolments and missing group memberships) without changing anything. After confirmation, the assignment is processed in the background by the next cron run. Only the participants of the preview are assigned: enrolments created after the preview are left to the automatic assignment of new enrolments. The time and configuration of the preview are kept on the server, not in the confirmation request; a preview can be confirmed once and within one hour. If the configuration is changed or disabled between preview and processing, the run is not carried out and has to be confirmed again.
+
+The settings page and the preview page show the status of the last run: scheduled, running, done (with the numbers added, already member, skipped, errors), not carried out, failed (retried automatically) or interrupted (no longer queued; start it again). A warning about group memberships that could not be added for new enrolments stays visible until a run has verified that no eligible participant misses a membership.
+
+If you want to learn more about using admin tool plugins in Moodle, please see https://docs.moodle.org/en/Admin_tools.
+
+
+Capabilities
+------------
+
+This plugin also introduces these additional capabilities:
+
+* **tool/ltigroupautoenrol:manage** - Allows to configure the automatic group assignment of a course and to assign existing LTI participants. The navigation link, the settings page and the backfill page all require this capability. By default, it is assigned to the editing teacher and manager roles; on upgrade, it is cloned from moodle/course:managegroups.
+
+
+Scheduled Tasks
+---------------
+
+This plugin does not add any additional scheduled tasks.
+
+It uses one adhoc task, **\tool_ltigroupautoenrol\task\backfill_task**, which is queued when a user confirms "Assign existing LTI participants" and is processed by the next cron run.
+
+
+How this plugin works / Pitfalls
+--------------------------------
+
+The plugin observes Moodle's user_enrolment_created event. A user enrolment is assigned to the groups of its LTI tool only if
+
+* it belongs to the enrol_lti instance of an LTI 1.3 tool of the same course,
+* the enrolment method instance is enabled and the user enrolment is active (not suspended),
+* the current time lies within the enrolment's start and end date,
+* the user is not deleted.
+
+A user enrolled through several LTI tools is assigned to the groups of each tool. Groups which no longer exist are skipped.
+
+Pitfalls:
+
+* **Group assignment is strictly additive - no automatic revocation.** The plugin only adds memberships and never removes any: not when the mapping is changed (members stay in the previously mapped group and are added to a new group only by the next enrolment or an "Assign existing LTI participants" run), not when the feature is disabled, not when an LTI tool is deleted and not when the plugin is uninstalled. Moodle core removes a user's group memberships only when the user loses their last enrolment in the course. If groups are used to separate consumers (group mode, restricted access), a changed mapping therefore does not withdraw access that was granted before; remove such memberships manually. Group memberships created by the plugin can always be removed manually by teachers.
+* **Only new enrolments are handled by the event.** Users who were enrolled before the configuration was saved, or whose enrolment becomes active later (start date in the future, suspension lifted), have to be assigned with "Assign existing LTI participants".
+* **Lifecycle:** When a course is deleted, its configuration is deleted. When an LTI enrolment method instance or a group is deleted, it is removed from the configuration. Existing group memberships are not touched by the plugin.
+* **Backup, restore and course copy:** The configuration is part of the course backup. On restore, its LTI tools and groups are mapped to the restored ones; pairs whose tool or group was not restored are dropped. Moodle restores the enrolment methods (and with them the LTI tools) only when they are included in the restore, and course settings into an existing course only with "Overwrite course configuration"; a course duplicated without users therefore has no LTI tools and no mapping. Restoring into a course with its own configuration keeps its on/off setting and adds the restored pairs.
+* **Errors never block an enrolment.** If a group membership can not be added for a new enrolment, the enrolment itself succeeds; the failure is reported in Moodle's debugging output (course and number only). The background assignment records failures in its status and is retried by the task API.
+* **Language packs:** Community translations from AMOS override the plugin's own language files. Strings whose meaning changed in 1.2 therefore got new identifiers, so outdated translations of 1.0.1/1.1 are not shown.
+
+
+Data privacy
+------------
+
+The plugin implements Moodle's null privacy provider. Data flows:
+
+* **Plugin table:** course settings (which LTI tool is mapped to which groups) and status, time and counters of the last "Assign existing LTI participants" run. No user data.
+* **Group memberships:** stored in Moodle core through the groups API; exported and deleted by Moodle's groups subsystem (core_group).
+* **Events and logs:** the plugin triggers no events of its own. Adding a membership triggers core's group_member_added event, which the standard log store records; it is covered by the log store's privacy provider.
+* **Background task:** course id, configuration fingerprint and preview time only.
+* **Debugging output and upgrade backups:** course ids, counters and course settings only.
+* **Course backups:** the course configuration only (on/off and tool to group mapping), no user data.
+* **Session:** the preview of "Assign existing LTI participants" (time, mapping fingerprint, course id) until it is confirmed or expires.
+
+
+Theme support
+-------------
+
+This plugin is developed and tested on Moodle Core's Boost theme.
+It should also work with Boost child themes, including Moodle Core's Classic theme. However, we can't support any other theme than Boost.
+
+
+Plugin repositories
+-------------------
+
+This plugin is published and regularly updated in the Moodle plugins repository:
+http://moodle.org/plugins/view/tool_ltigroupautoenrol
+
+The latest development version can be found on Github:
+https://github.com/ralferlebach/moodle-tool_ltigroupautoenrol
+
+
+Bug and problem reports / Support requests
+------------------------------------------
+
+This plugin is carefully developed and thoroughly tested, but bugs and problems can always appear.
+
+Please report bugs and problems on Github:
+https://github.com/ralferlebach/moodle-tool_ltigroupautoenrol/issues
+
+We will do our best to solve your problems, but please note that due to limited resources we can't always provide per-case support.
+
+
+Feature proposals
+-----------------
+
+Due to limited resources, the functionality of this plugin is primarily implemented for our own local needs and published as-is to the community. We are aware that members of the community will have other needs and would love to see them solved by this plugin.
+
+Please issue feature proposals on Github:
+https://github.com/ralferlebach/moodle-tool_ltigroupautoenrol/issues
+
+Please create pull requests on Github:
+https://github.com/ralferlebach/moodle-tool_ltigroupautoenrol/pulls
+
+We are always interested to read about your feature proposals or even get a pull request from you, but please accept that we can handle your issues only as feature _proposals_ and not as feature _requests_.
+
+
+Moodle release support
+----------------------
+
+Due to limited resources, this plugin is only maintained for the most recent major release of Moodle as well as the most recent LTS release of Moodle. Bugfixes are backported to the LTS release. However, new features and improvements are not necessarily backported to the LTS release.
+
+Apart from these maintained releases, previous versions of this plugin which work in legacy major releases of Moodle are still available as-is without any further updates in the Moodle Plugins repository.
+
+There may be several weeks after a new major release of Moodle has been published until we can do a compatibility check and fix problems if necessary. If you encounter problems with a new major release of Moodle - or can confirm that this plugin still works with a new major release - please let us know on Github.
+
+This plugin is designed to be compatible with all currently supported versions of Moodle, leveraging its latest APIs. However, if you are using a legacy version of Moodle, we kindly advise against installing or using this plugin. Instead, we strongly recommend updating your Moodle instance to a supported version to ensure security and compliance with current technological standards. Thank you for your understanding.
+
+The continuous integration tests these combinations: Moodle 4.5 with PHP 8.1 and 8.3, Moodle 5.0 and 5.1 with PHP 8.4, Moodle 5.2 and 5.3 with PHP 8.3 and 8.4, each with PostgreSQL and MariaDB (PHP 8.1 and PHP 8.3 on Moodle 5.2/5.3 with PostgreSQL only). Moodle 5.3 runs on PostgreSQL 17 and MariaDB 11.4, the older branches on PostgreSQL 16 and MariaDB 10.11. As in the plugin template, the job "Release artefact contents" builds the archive with git archive and checks that it ships what Moodle runs and none of the development tooling (.github, docs except docs/CHANGES.md, tests/playwright, tests/upgrade, dotfiles); the job "Installation smoke test" installs exactly the candidate ZIP built from the same commit (SHA-256 checked) on a fresh Moodle 4.5 and 5.3 site and runs the production path once, and the upgrade test upgrades a site from the published 1.0.1 to exactly that ZIP.
+
+Release contract: the job "Release gate" passes only if all test cells, the upgrade test, the Playwright tests, the artefact check, the installation smoke test and the gate self-test are "success"; any other result (failure, cancelled, skipped, missing) fails it (the gate logic is .github/scripts/release_gate.sh, its fail-closed behaviour is checked by the job "Release gate self-test" in every run). Only then the candidate ZIP is published as the artifact `tool_ltigroupautoenrol-<commit>`; the artifact `candidate-…` is an unreleased intermediate. "CI complete" is the single status check to require in the branch protection of `main`. As long as Moodle 4.5 is supported, the PHPUnit tests keep the PHPUnit 9 conventions (@covers and @dataProvider annotations in docblocks).
+
+Tests: PHPUnit (incl. upgrade tests from the historical schemas, uninstall/reinstall, backup/restore and course duplication, query budgets), a real site upgrade from the published 1.0.1 on Moodle 4.5 and 5.3 with PostgreSQL and MariaDB (tests/upgrade), Behat (incl. axe accessibility checks) and Playwright browser tests on Moodle 4.5 and 5.3 (tests/playwright: page identity, axe, keyboard and focus, reflow at 200 %/400 % zoom and on a phone, German user interface, access denial).
+
+
+Translating this plugin
+-----------------------
+
+This Moodle plugin is provided with English and German language packs only. Translations into other languages must be managed through AMOS (https://lang.moodle.org), where they will become part of Moodle's official language pack.
+
+As the plugin creator, we continue to maintain the German translation. For all other languages, we kindly ask you to contribute your translations directly in AMOS. These contributions will be reviewed by Moodle's official language pack maintainers before being included in the official repository.
+
+Thank you for supporting the global Moodle community!
+
+
+Right-to-left support
+---------------------
+
+This plugin has not been tested with Moodle's support for right-to-left (RTL) languages.
+If you want to use this plugin with a RTL language and it doesn't work as-is, you are free to send us a pull request on Github with modifications.
+
+
+Maintainers
+-----------
+
+The plugin is maintained by\
+Ralf Erlebach
+
+
+Copyright
+---------
+
+The copyright of this plugin is held by\
+Ralf Erlebach
+
+Individual copyrights of individual developers are tracked in PHPDoc comments and Git commits.

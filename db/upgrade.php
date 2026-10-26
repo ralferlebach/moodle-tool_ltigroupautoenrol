@@ -26,24 +26,50 @@
 /**
  * xmldb_tool_ltigroupautoenrol_upgrade
  *
+ * The former step "$oldversion < 2024040400" (inherited from tool_groupautoenrol) was removed:
+ * no version of this component was ever older than 2024050100, so it could never run.
+ *
  * @param int $oldversion
  * @return bool true
  */
 function xmldb_tool_ltigroupautoenrol_upgrade(int $oldversion): bool {
+    global $CFG;
+    require_once($CFG->dirroot . '/admin/tool/ltigroupautoenrol/db/upgradelib.php');
 
-    global $DB;
-    $dbman = $DB->get_manager();
+    if ($oldversion < 2026100800) {
+        // Repair the 0.1 schema, normalise mappings, remove duplicates, add the unique key on courseid
+        // and the fields keeping the outcome of the last backfill run (counters only).
+        $report = array_merge(
+            tool_ltigroupautoenrol_upgrade_repair_legacy_schema(),
+            tool_ltigroupautoenrol_upgrade_enforce_unique_course(),
+            tool_ltigroupautoenrol_upgrade_normalise_mappings(),
+            tool_ltigroupautoenrol_upgrade_add_backfill_status()
+        );
+        foreach ($report as $line) {
+            mtrace('tool_ltigroupautoenrol: ' . $line);
+        }
 
-    if ($oldversion < 2024040400) {
-        // Changing type of field groupslist on table tool_ltigroupautoenrol to text.
-        $table = new xmldb_table('tool_ltigroupautoenrol');
-        $field = new xmldb_field('groupslist', XMLDB_TYPE_TEXT, null, null, null, null, null, 'use_groupslist');
+        upgrade_plugin_savepoint(true, 2026100800, 'tool', 'ltigroupautoenrol');
+    }
 
-        // Launch change of type for field groupslist.
-        $dbman->change_field_type($table, $field);
+    if ($oldversion < 2026100801) {
+        // Sites that installed the pre-release state of 2026100800 (pull request #11) lack the backfill status
+        // and event error fields. The step only adds missing fields, so it is a no-op everywhere else.
+        foreach (tool_ltigroupautoenrol_upgrade_add_backfill_status() as $line) {
+            mtrace('tool_ltigroupautoenrol: ' . $line);
+        }
 
-        // Groupautoenrol savepoint reached.
-        upgrade_plugin_savepoint(true, 2024040400, 'tool', 'ltigroupautoenrol');
+        upgrade_plugin_savepoint(true, 2026100801, 'tool', 'ltigroupautoenrol');
+    }
+
+    if ($oldversion < 2026102500) {
+        // Time of the last unresolved failure of the enrolment observer: a backfill clears only failures
+        // recorded before its final check (see config_repository::clear_event_errors()).
+        foreach (tool_ltigroupautoenrol_upgrade_add_backfill_status() as $line) {
+            mtrace('tool_ltigroupautoenrol: ' . $line);
+        }
+
+        upgrade_plugin_savepoint(true, 2026102500, 'tool', 'ltigroupautoenrol');
     }
     return true;
 }
