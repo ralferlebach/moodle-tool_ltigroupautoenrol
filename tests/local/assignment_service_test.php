@@ -244,6 +244,11 @@ final class assignment_service_test extends \advanced_testcase {
         $this->plugingenerator->enrol_via_lti($this->tool2, $user->id);
         $ue = $DB->get_record('user_enrolments', ['enrolid' => $this->tool2->enrolid, 'userid' => $user->id]);
         $DB->delete_records('groups_members', ['userid' => $user->id]);
+        // The budget is the plugin's own cost: observers of other plugins (e.g. tool_ltidiagnostics, which records the
+        // plugin's events with one insert each) are not counted.
+        $observers = [];
+        require(__DIR__ . '/../../db/events.php');
+        \core\event\manager::phpunit_replace_observers($observers);
         $reads = $DB->perf_get_reads();
         $writes = $DB->perf_get_writes();
         assignment_service::handle_new_enrolment($this->course->id, $ue);

@@ -182,6 +182,61 @@ final class backup_restore_test extends \advanced_testcase {
     }
 
     /**
+     * Course copy ("Copy course" with user data, asynchronous copy task): the copied LTI tools are mapped to the copied
+     * groups and enrolments through a copied tool are assigned to the copied groups. Core does not copy enrol_lti user
+     * enrolments, so earlier participants are assigned in the copy when they launch it again.
+     */
+    public function test_course_copy_with_user_data(): void {
+        global $DB;
+        $gen = $this->getDataGenerator();
+        $plugingen = $gen->get_plugin_generator('tool_ltigroupautoenrol');
+        $tools = lti_resolver::get_course_tools($this->course->id);
+        $alpha = reset($tools);
+        $student = $gen->create_user();
+        $plugingen->enrol_via_lti($alpha, $student->id);
+        $studentrole = (int) $DB->get_field('role', 'id', ['shortname' => 'student']);
+
+        $shortname = 'COPY' . uniqid();
+        $copydata = \copy_helper::process_formdata((object) [
+            'courseid' => $this->course->id, 'fullname' => 'Copy', 'shortname' => $shortname,
+            'category' => $this->course->category, 'visible' => 1, 'startdate' => time(), 'enddate' => 0,
+            'idnumber' => '', 'userdata' => 1, 'role_' . $studentrole => $studentrole,
+        ]);
+        \copy_helper::create_copy($copydata);
+        $task = \core\task\manager::get_next_adhoc_task(time());
+        $this->assertInstanceOf(\core\task\asynchronous_copy_task::class, $task);
+        ob_start();
+        $task->execute();
+        ob_end_clean();
+        \core\task\manager::adhoc_task_complete($task);
+        $copyid = (int) $DB->get_field('course', 'id', ['shortname' => $shortname], MUST_EXIST);
+
+        $this->assertSame(
+            ['Alpha' => ['Consumer A', 'Consumer B'], 'Beta' => ['Consumer B']],
+            $this->mapping_by_name($copyid)
+        );
+        $copygroups = [];
+        foreach (groups_get_all_groups($copyid) as $group) {
+            $copygroups[$group->name] = (int) $group->id;
+        }
+        // Core's course copy keeps the role assignment but not the enrol_lti user enrolment (and so no membership):
+        // the participant is enrolled again by the next launch, which the plugin assigns like any new enrolment.
+        $this->assertFalse(is_enrolled(\context_course::instance($copyid), $student->id));
+        $this->assertFalse(groups_is_member($copygroups['Consumer A'], $student->id));
+        $copytools = [];
+        foreach (lti_resolver::get_course_tools($copyid) as $tool) {
+            $copytools[lti_resolver::get_tool_name($tool)] = $tool;
+        }
+        $plugingen->enrol_via_lti($copytools['Alpha'], $student->id);
+        $this->assertTrue(groups_is_member($copygroups['Consumer A'], $student->id));
+        $this->assertTrue(groups_is_member($copygroups['Consumer B'], $student->id));
+        $newcomer = $gen->create_user();
+        $plugingen->enrol_via_lti($copytools['Beta'], $newcomer->id);
+        $this->assertTrue(groups_is_member($copygroups['Consumer B'], $newcomer->id));
+        $this->assertFalse(groups_is_member($copygroups['Consumer A'], $newcomer->id));
+    }
+
+    /**
      * Restoring into an existing course with its own configuration ("overwrite course configuration") keeps its
      * enabled flag and adds the restored pairs.
      */

@@ -33,12 +33,13 @@ class provider implements \core_privacy\local\metadata\null_provider {
     /**
      * Get the language string identifier with the component's language file to explain why this plugin stores no data.
      *
-     * The identifier changed in 1.2 (formerly privacy:null_reason) because the text changed; the
-     * old community translations of the old text must not be shown for the new one.
+     * The identifier changed in 1.2 (formerly privacy:null_reason) and in 1.2.1 (formerly privacy:reason,
+     * now also naming the plugin's events) because the text changed; community translations of an old
+     * text must not be shown for the new one.
      *
      * @return  string
      */
     public static function get_reason(): string {
-        return 'privacy:reason';
+        return 'privacy:reason_events';
     }
 }

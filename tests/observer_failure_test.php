@@ -33,6 +33,7 @@ use tool_ltigroupautoenrol\tests\failing_observer;
  * @author     Ralf Erlebach - https://github.com/ralferlebach
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  * @covers     \tool_ltigroupautoenrol\observer
+ * @covers     \tool_ltigroupautoenrol\local\event_reporter
  */
 final class observer_failure_test extends \advanced_testcase {
     /** @var string|false Previous error_log setting. */
@@ -46,11 +47,16 @@ final class observer_failure_test extends \advanced_testcase {
     protected function setUp(): void {
         parent::setUp();
         require_once(__DIR__ . '/fixtures/failing_observer.php');
+        require_once(__DIR__ . '/fixtures/event_recorder.php');
         $this->resetAfterTest();
         \core\event\manager::phpunit_replace_observers([[
             'eventname' => '\core\event\user_enrolment_created',
             'callback' => '\tool_ltigroupautoenrol\tests\failing_observer::user_is_enrolled',
+        ], [
+            'eventname' => '\tool_ltigroupautoenrol\event\group_assignment_failed',
+            'callback' => '\tool_ltigroupautoenrol\tests\event_recorder::record',
         ]]);
+        \tool_ltigroupautoenrol\tests\event_recorder::$events = [];
         failing_observer::$assignfailure = null;
         failing_observer::$recordfails = false;
         $this->errorlog = ini_set('error_log', '/dev/null');
@@ -106,6 +112,17 @@ final class observer_failure_test extends \advanced_testcase {
             "tool_ltigroupautoenrol: assignment of a new LTI enrolment in course {$course->id} failed: " . get_class($failure)
         );
         $this->assertSame(1, config_repository::get_event_errors($course->id)->count);
+        // The failure is reported as event (ids and the class basename only; tool not resolved: 0).
+        $events = \tool_ltigroupautoenrol\tests\event_recorder::$events;
+        $this->assertCount(1, $events);
+        $this->assertInstanceOf(\tool_ltigroupautoenrol\event\group_assignment_failed::class, $events[0]);
+        $this->assertEquals($user->id, $events[0]->relateduserid);
+        $this->assertEquals($tool->enrolid, $events[0]->objectid);
+        $this->assertSame(
+            ['source' => 'event', 'code' => \tool_ltigroupautoenrol\local\event_reporter::code_of($failure), 'errors' => 1,
+                'toolid' => 0],
+            $events[0]->other
+        );
 
         // Asynchronous repair: the backfill assigns the user; afterwards nothing is missing and the count is cleared.
         failing_observer::$assignfailure = null;

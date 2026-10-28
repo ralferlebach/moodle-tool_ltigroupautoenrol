@@ -118,4 +118,71 @@ final class scaling_test extends \advanced_testcase {
         }
         $this->assertCount(1, array_unique($readsbysize), 'queries: ' . json_encode($readsbysize));
     }
+
+    /**
+     * No N+1 on the read path of the backfill: a repeated run over assigned participants needs the same number of
+     * queries for 10 and 60 participants (one batch query and one membership prefetch per batch).
+     */
+    public function test_repeated_backfill_query_budget(): void {
+        global $DB;
+        $this->resetAfterTest();
+        $gen = $this->getDataGenerator();
+        $plugingen = $gen->get_plugin_generator('tool_ltigroupautoenrol');
+        $course = $gen->create_course();
+        $tool = $plugingen->create_lti_tool($course->id);
+        $groups = [];
+        for ($i = 0; $i < 3; $i++) {
+            $groups[] = (int) $gen->create_group(['courseid' => $course->id])->id;
+        }
+        $config = $plugingen->create_config($course->id, [$tool->id => $groups]);
+        $readsbysize = [];
+        $enrolled = 0;
+        foreach ([10, 60] as $size) {
+            for (; $enrolled < $size; $enrolled++) {
+                // Enrolled with the feature on: the observer assigns all three groups.
+                $plugingen->enrol_via_lti($tool, $gen->create_user()->id);
+            }
+            assignment_service::backfill($config);
+            $reads = $DB->perf_get_reads();
+            $writes = $DB->perf_get_writes();
+            $result = assignment_service::backfill($config);
+            $readsbysize[$size] = $DB->perf_get_reads() - $reads;
+            $this->assertSame(0, $DB->perf_get_writes() - $writes, "writes with $size assigned participants");
+            $this->assertSame(3 * $size, $result->alreadymember);
+            $this->assertSame(0, $result->added);
+        }
+        $this->assertCount(1, array_unique($readsbysize), 'queries: ' . json_encode($readsbysize));
+        $this->assertLessThanOrEqual(6, $readsbysize[60], 'queries: ' . json_encode($readsbysize));
+    }
+
+    /**
+     * The batch is reduced for tools mapped to many groups, so a batch prefetches at most MAX_PREFETCH_ROWS rows.
+     *
+     * @dataProvider batch_size_provider
+     * @param int $requested
+     * @param int $groups
+     * @param int $expected
+     */
+    public function test_effective_batch_size(int $requested, int $groups, int $expected): void {
+        $this->assertSame($expected, assignment_service::effective_batch_size($requested, $groups));
+        if ($expected > 1) {
+            $this->assertLessThanOrEqual(assignment_service::MAX_PREFETCH_ROWS, $expected * $groups);
+        }
+    }
+
+    /**
+     * Batch sizes: requested, number of mapped groups, expected.
+     *
+     * @return array
+     */
+    public static function batch_size_provider(): array {
+        return [
+            'no group' => [500, 0, 500],
+            'few groups' => [500, 3, 500],
+            '100 groups' => [500, 100, 500],
+            '101 groups' => [500, 101, 495],
+            '1000 groups (mapping limit)' => [500, 1000, 50],
+            'more groups than rows' => [500, 60000, 1],
+        ];
+    }
 }

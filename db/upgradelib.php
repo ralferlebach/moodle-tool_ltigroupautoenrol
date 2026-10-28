@@ -80,6 +80,7 @@ function tool_ltigroupautoenrol_upgrade_backup(string $name, array $rows): strin
  *
  * Reports what the upgrade to 1.2 will change: legacy 0.1 fields and configured legacy values,
  * configurations of deleted courses, duplicate configurations per course and invalid mappings.
+ * Each check is a separate function, so every one of them stays simple and testable.
  *
  * @return string[] Report lines (no personal data).
  */
@@ -90,49 +91,93 @@ function tool_ltigroupautoenrol_upgrade_analyse(): array {
     if (!$dbman->table_exists($table)) {
         return ['Table tool_ltigroupautoenrol does not exist (plugin not installed).'];
     }
-    $report = [];
+    $settingsexists = $dbman->field_exists($table, new xmldb_field('settings'));
+    $report = array_merge(
+        ['Rows: ' . $DB->count_records('tool_ltigroupautoenrol')],
+        tool_ltigroupautoenrol_upgrade_analyse_legacy($table),
+        ['Field "settings" present: ' . ($settingsexists ? 'yes' : 'no (will be added)')],
+        [tool_ltigroupautoenrol_upgrade_analyse_orphans(), tool_ltigroupautoenrol_upgrade_analyse_duplicates()]
+    );
+    if ($settingsexists) {
+        $report[] = tool_ltigroupautoenrol_upgrade_analyse_mappings();
+    }
+    return $report;
+}
+
+/**
+ * Analysis: legacy 0.1 fields and rows with configured (non-default) legacy values.
+ *
+ * @param xmldb_table $table
+ * @return string[] Report lines.
+ */
+function tool_ltigroupautoenrol_upgrade_analyse_legacy(xmldb_table $table): array {
+    global $DB;
+    $dbman = $DB->get_manager();
     $present = array_values(array_filter(
         TOOL_LTIGROUPAUTOENROL_LEGACY_FIELDS,
         fn(string $name): bool => $dbman->field_exists($table, new xmldb_field($name))
     ));
-    $report[] = 'Rows: ' . $DB->count_records('tool_ltigroupautoenrol');
-    $report[] = 'Legacy 0.1 fields present: ' . ($present ? implode(', ', $present) : 'none');
-    if ($present) {
-        $configured = 0;
-        $rs = $DB->get_recordset('tool_ltigroupautoenrol', null, 'id', 'id, ' . implode(', ', $present));
-        foreach ($rs as $record) {
-            $configured += tool_ltigroupautoenrol_upgrade_legacy_values($record, $present) ? 1 : 0;
-        }
-        $rs->close();
-        $report[] = "Rows with configured legacy values (will be backed up and removed): {$configured}";
+    $report = ['Legacy 0.1 fields present: ' . ($present ? implode(', ', $present) : 'none')];
+    if (!$present) {
+        return $report;
     }
-    $settingsexists = $dbman->field_exists($table, new xmldb_field('settings'));
-    $report[] = 'Field "settings" present: ' . ($settingsexists ? 'yes' : 'no (will be added)');
+    $configured = 0;
+    $rs = $DB->get_recordset('tool_ltigroupautoenrol', null, 'id', 'id, ' . implode(', ', $present));
+    foreach ($rs as $record) {
+        $configured += tool_ltigroupautoenrol_upgrade_legacy_values($record, $present) ? 1 : 0;
+    }
+    $rs->close();
+    $report[] = "Rows with configured legacy values (will be backed up and removed): {$configured}";
+    return $report;
+}
+
+/**
+ * Analysis: configurations of deleted courses.
+ *
+ * @return string Report line.
+ */
+function tool_ltigroupautoenrol_upgrade_analyse_orphans(): string {
+    global $DB;
     $orphans = $DB->count_records_sql(
         "SELECT COUNT(1) FROM {tool_ltigroupautoenrol} t LEFT JOIN {course} c ON c.id = t.courseid WHERE c.id IS NULL"
     );
-    $report[] = "Configurations of deleted courses (will be backed up and removed): {$orphans}";
+    return "Configurations of deleted courses (will be backed up and removed): {$orphans}";
+}
+
+/**
+ * Analysis: courses with more than one configuration row.
+ *
+ * @return string Report line.
+ */
+function tool_ltigroupautoenrol_upgrade_analyse_duplicates(): string {
+    global $DB;
     $duplicates = $DB->get_records_sql(
         "SELECT courseid, COUNT(1) AS cnt FROM {tool_ltigroupautoenrol} GROUP BY courseid HAVING COUNT(1) > 1"
     );
     $extra = array_sum(array_map(fn($d) => (int) $d->cnt - 1, $duplicates));
-    $report[] = 'Courses with duplicate configurations: ' . count($duplicates)
+    return 'Courses with duplicate configurations: ' . count($duplicates)
         . ($duplicates ? ' (' . implode(', ', array_keys($duplicates)) . ")" : '')
         . "; rows to be backed up and removed: {$extra}";
-    if ($settingsexists) {
-        $invalid = [];
-        $rs = $DB->get_recordset('tool_ltigroupautoenrol', null, 'id', 'id, courseid, settings');
-        foreach ($rs as $record) {
-            try {
-                \tool_ltigroupautoenrol\local\mapping::from_json($record->settings);
-            } catch (\tool_ltigroupautoenrol\local\invalid_mapping_exception $e) {
-                $invalid[] = $record->courseid;
-            }
+}
+
+/**
+ * Analysis: courses whose stored mapping is invalid (requires the field "settings").
+ *
+ * @return string Report line.
+ */
+function tool_ltigroupautoenrol_upgrade_analyse_mappings(): string {
+    global $DB;
+    $invalid = [];
+    $rs = $DB->get_recordset('tool_ltigroupautoenrol', null, 'id', 'id, courseid, settings');
+    foreach ($rs as $record) {
+        try {
+            \tool_ltigroupautoenrol\local\mapping::from_json($record->settings);
+        } catch (\tool_ltigroupautoenrol\local\invalid_mapping_exception $e) {
+            $invalid[] = $record->courseid;
         }
-        $rs->close();
-        $report[] = 'Courses with invalid mappings (kept, ignored at runtime): ' . ($invalid ? implode(', ', $invalid) : 'none');
     }
-    return $report;
+    $rs->close();
+    return 'Courses with invalid mappings (kept, ignored at runtime): ' . ($invalid ? implode(', ', $invalid) : 'none');
 }
 
 /**

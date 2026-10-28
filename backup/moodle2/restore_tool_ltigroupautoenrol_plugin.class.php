@@ -70,7 +70,6 @@ class restore_tool_ltigroupautoenrol_plugin extends restore_tool_plugin {
      * @return void
      */
     public function after_restore_course() {
-        global $DB;
         if (!$this->restoredconfig) {
             return;
         }
@@ -81,9 +80,24 @@ class restore_tool_ltigroupautoenrol_plugin extends restore_tool_plugin {
             // A corrupt mapping in the backup is not restored.
             return;
         }
-        // Tool ids come from the restore mapping of enrol_lti; each must also belong to an LTI enrolment instance of
-        // the restored course (see tool_belongs_to_course()), so no tool of another course or without an instance
-        // is stored.
+        $restored = $this->translate($source, $courseid);
+        if (!$restored->is_empty()) {
+            $this->store($courseid, $restored);
+        }
+    }
+
+    /**
+     * Translates the tool and group ids of the backup to the restored ones.
+     *
+     * Tool ids come from the restore mapping of enrol_lti; each must also belong to an LTI enrolment instance of
+     * the restored course (see tool_belongs_to_course()), so no tool of another course or without an instance
+     * is stored. Groups must have been restored into the course.
+     *
+     * @param mapping $source Mapping of the backup.
+     * @param int $courseid Restored course.
+     * @return mapping
+     */
+    private function translate(mapping $source, int $courseid): mapping {
         $coursegroups = groups_get_all_groups($courseid);
         $translated = [];
         foreach ($source->to_array() as $oldtoolid => $oldgroupids) {
@@ -98,24 +112,31 @@ class restore_tool_ltigroupautoenrol_plugin extends restore_tool_plugin {
                 }
             }
         }
-        $restored = new mapping($translated);
-        if ($restored->is_empty()) {
-            return;
-        }
+        return new mapping($translated);
+    }
+
+    /**
+     * Stores the restored mapping; a course with its own configuration keeps its on/off flag and gets the pairs added.
+     *
+     * @param int $courseid
+     * @param mapping $restored Not empty.
+     * @return void
+     */
+    private function store(int $courseid, mapping $restored): void {
         try {
             $existing = config_repository::get($courseid);
         } catch (invalid_mapping_exception $e) {
             $existing = null;
         }
-        if ($existing) {
-            $merged = $existing->mapping->to_array();
-            foreach ($restored->to_array() as $toolid => $groupids) {
-                $merged[$toolid] = array_values(array_unique(array_merge($merged[$toolid] ?? [], $groupids)));
-            }
-            config_repository::save(new course_config($courseid, $existing->enabled, new mapping($merged)));
+        if (!$existing) {
+            config_repository::save(new course_config($courseid, !empty($this->restoredconfig->enable_enrol), $restored));
             return;
         }
-        config_repository::save(new course_config($courseid, !empty($this->restoredconfig->enable_enrol), $restored));
+        $merged = $existing->mapping->to_array();
+        foreach ($restored->to_array() as $toolid => $groupids) {
+            $merged[$toolid] = array_values(array_unique(array_merge($merged[$toolid] ?? [], $groupids)));
+        }
+        config_repository::save(new course_config($courseid, $existing->enabled, new mapping($merged)));
     }
 
     /**

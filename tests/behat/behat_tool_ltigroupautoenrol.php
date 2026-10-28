@@ -81,16 +81,91 @@ class behat_tool_ltigroupautoenrol extends behat_base {
     }
 
     /**
-     * Looks up a group membership by user name and group name.
+     * Checks that a user is a member of a group of a given course (group names may repeat after a course copy).
+     *
+     * @Then /^"([^"]*)" should be a member of group "([^"]*)" in course "([^"]*)"$/
+     * @param string $username
+     * @param string $groupname
+     * @param string $shortname Course short name.
+     * @return void
+     */
+    public function user_should_be_member_of_group_in_course(string $username, string $groupname, string $shortname): void {
+        if (!$this->is_member($username, $groupname, $shortname)) {
+            throw new ExpectationException("'$username' is not a member of '$groupname' in '$shortname'", $this->getSession());
+        }
+    }
+
+    /**
+     * Checks that a user is not a member of a group of a given course.
+     *
+     * @Then /^"([^"]*)" should not be a member of group "([^"]*)" in course "([^"]*)"$/
+     * @param string $username
+     * @param string $groupname
+     * @param string $shortname Course short name.
+     * @return void
+     */
+    public function user_should_not_be_member_of_group_in_course(string $username, string $groupname, string $shortname): void {
+        if ($this->is_member($username, $groupname, $shortname)) {
+            throw new ExpectationException("'$username' is a member of '$groupname' in '$shortname'", $this->getSession());
+        }
+    }
+
+    /**
+     * Copies a course like "Copy course" with "Include user data" and the enrolments of one role kept: the same
+     * core API as the copy form (copy_helper) and the asynchronous copy task, run at once.
+     *
+     * @Given /^the course "([^"]*)" is copied as "([^"]*)" with the user data of role "([^"]*)"$/
+     * @param string $shortname Source course.
+     * @param string $copyshortname Short name of the copy.
+     * @param string $role Role short name whose enrolments are kept.
+     * @return void
+     */
+    public function the_course_is_copied(string $shortname, string $copyshortname, string $role): void {
+        global $CFG, $DB, $USER;
+        require_once($CFG->dirroot . '/backup/util/includes/backup_includes.php');
+        require_once($CFG->dirroot . '/backup/util/includes/restore_includes.php');
+        $course = $DB->get_record('course', ['shortname' => $shortname], '*', MUST_EXIST);
+        $roleid = (int) $DB->get_field('role', 'id', ['shortname' => $role], MUST_EXIST);
+        $previous = $USER;
+        \core\session\manager::set_user(get_admin());
+        try {
+            \copy_helper::create_copy(\copy_helper::process_formdata((object) [
+                'courseid' => $course->id, 'fullname' => $copyshortname, 'shortname' => $copyshortname,
+                'category' => $course->category, 'visible' => 1, 'startdate' => time(), 'enddate' => 0, 'idnumber' => '',
+                'userdata' => 1, 'role_' . $roleid => $roleid,
+            ]));
+            while ($task = \core\task\manager::get_next_adhoc_task(time())) {
+                if (!$task instanceof \core\task\asynchronous_copy_task) {
+                    \core\task\manager::adhoc_task_failed($task);
+                    continue;
+                }
+                ob_start();
+                $task->execute();
+                ob_end_clean();
+                \core\task\manager::adhoc_task_complete($task);
+            }
+        } finally {
+            \core\session\manager::set_user($previous);
+        }
+        $DB->get_record('course', ['shortname' => $copyshortname], 'id', MUST_EXIST);
+    }
+
+    /**
+     * Looks up a group membership by user name and group name (and course short name, if given).
      *
      * @param string $username
      * @param string $groupname
+     * @param string|null $shortname
      * @return bool
      */
-    private function is_member(string $username, string $groupname): bool {
+    private function is_member(string $username, string $groupname, ?string $shortname = null): bool {
         global $DB;
         $userid = $DB->get_field('user', 'id', ['username' => $username], MUST_EXIST);
-        $groupid = $DB->get_field('groups', 'id', ['name' => $groupname], MUST_EXIST);
+        $conditions = ['name' => $groupname];
+        if ($shortname !== null) {
+            $conditions['courseid'] = $DB->get_field('course', 'id', ['shortname' => $shortname], MUST_EXIST);
+        }
+        $groupid = $DB->get_field('groups', 'id', $conditions, MUST_EXIST);
         return $DB->record_exists('groups_members', ['userid' => $userid, 'groupid' => $groupid]);
     }
 }

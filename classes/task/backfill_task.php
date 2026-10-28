@@ -29,7 +29,7 @@ use tool_ltigroupautoenrol\local\invalid_mapping_exception;
  * mapping the user confirmed; if the configuration changed meanwhile, the task does nothing and
  * records the status "skipped", which the pages show. Only enrolments that existed at previewtime
  * are assigned (the approved set). The task holds a per-course lock, works in batches and is
- * idempotent, so a retry after a failure is safe. Neither custom data nor log output contain user ids.
+ * idempotent, so a retry after a failure is safe. Neither custom data nor task output contain user ids
  *
  * @package    tool_ltigroupautoenrol
  * @copyright  2026 Ralf Erlebach
@@ -116,43 +116,70 @@ class backfill_task extends \core\task\adhoc_task {
             throw new \moodle_exception('error_backfilllocked', 'tool_ltigroupautoenrol', '', $courseid);
         }
         try {
-            try {
-                $config = config_repository::get($courseid);
-            } catch (invalid_mapping_exception $e) {
-                config_repository::record_backfill_status($courseid, config_repository::BACKFILL_SKIPPED);
-                mtrace("tool_ltigroupautoenrol: invalid mapping in course {$courseid}, backfill skipped.");
-                return;
-            }
-            if (!$config || !$config->enabled || $config->mapping->get_hash() !== $hash) {
-                config_repository::record_backfill_status($courseid, config_repository::BACKFILL_SKIPPED);
-                mtrace("tool_ltigroupautoenrol: configuration of course {$courseid} changed or disabled, backfill skipped.");
-                return;
-            }
-            config_repository::record_backfill_status($courseid, config_repository::BACKFILL_RUNNING);
-            try {
-                $result = $this->run_backfill($config, $previewtime);
-                config_repository::record_backfill($courseid, $result);
-                if ($result->errors === 0) {
-                    // The run covers the set approved in the preview only. Failures of the enrolment observer are
-                    // cleared only if no currently eligible participant misses a membership, and only those
-                    // recorded before this check.
-                    $checktime = time();
-                    if (assignment_service::count_missing($config, $checktime) === 0) {
-                        config_repository::clear_event_errors($courseid, $checktime);
-                    }
-                }
-            } catch (\Throwable $e) {
-                // Never leave "running" behind: the status shows the failure, the task API retries the task.
-                config_repository::record_backfill_status($courseid, config_repository::BACKFILL_FAILED);
-                mtrace("tool_ltigroupautoenrol: backfill course {$courseid} failed: " . get_class($e));
-                throw $e;
-            }
-            mtrace("tool_ltigroupautoenrol: backfill course {$courseid}: " . json_encode($result->to_array()));
-            if ($result->errors > 0) {
-                throw new \moodle_exception('error_backfillpartial', 'tool_ltigroupautoenrol', '', $result->errors);
+            $config = $this->get_confirmed_config($courseid, $hash);
+            if ($config) {
+                $this->process($config, $previewtime);
             }
         } finally {
             $lock->release();
+        }
+    }
+
+    /**
+     * Returns the configuration if it is still the confirmed one; otherwise records "skipped".
+     *
+     * @param int $courseid
+     * @param string $hash Fingerprint of the confirmed mapping.
+     * @return course_config|null
+     */
+    private function get_confirmed_config(int $courseid, string $hash): ?course_config {
+        try {
+            $config = config_repository::get($courseid);
+        } catch (invalid_mapping_exception $e) {
+            config_repository::record_backfill_status($courseid, config_repository::BACKFILL_SKIPPED);
+            mtrace("tool_ltigroupautoenrol: invalid mapping in course {$courseid}, backfill skipped.");
+            return null;
+        }
+        if (!$config || !$config->enabled || $config->mapping->get_hash() !== $hash) {
+            config_repository::record_backfill_status($courseid, config_repository::BACKFILL_SKIPPED);
+            mtrace("tool_ltigroupautoenrol: configuration of course {$courseid} changed or disabled, backfill skipped.");
+            return null;
+        }
+        return $config;
+    }
+
+    /**
+     * Runs the backfill of a confirmed configuration under the course lock and records its outcome.
+     *
+     * @param course_config $config
+     * @param int|null $previewtime
+     * @return void
+     * @throws \moodle_exception If memberships could not be added (task is retried).
+     */
+    private function process(course_config $config, ?int $previewtime): void {
+        $courseid = $config->courseid;
+        config_repository::record_backfill_status($courseid, config_repository::BACKFILL_RUNNING);
+        try {
+            $result = $this->run_backfill($config, $previewtime);
+            config_repository::record_backfill($courseid, $result);
+            if ($result->errors === 0) {
+                // The run covers the set approved in the preview only. Failures of the enrolment observer are
+                // cleared only if no currently eligible participant misses a membership, and only those
+                // recorded before this check.
+                $checktime = time();
+                if (assignment_service::count_missing($config, $checktime) === 0) {
+                    config_repository::clear_event_errors($courseid, $checktime);
+                }
+            }
+        } catch (\Throwable $e) {
+            // Never leave "running" behind: the status shows the failure, the task API retries the task.
+            config_repository::record_backfill_status($courseid, config_repository::BACKFILL_FAILED);
+            mtrace("tool_ltigroupautoenrol: backfill course {$courseid} failed: " . get_class($e));
+            throw $e;
+        }
+        mtrace("tool_ltigroupautoenrol: backfill course {$courseid}: " . json_encode($result->to_array()));
+        if ($result->errors > 0) {
+            throw new \moodle_exception('error_backfillpartial', 'tool_ltigroupautoenrol', '', $result->errors);
         }
     }
 

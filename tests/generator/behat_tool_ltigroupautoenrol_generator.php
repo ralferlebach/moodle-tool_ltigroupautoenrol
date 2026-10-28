@@ -19,7 +19,9 @@
  *
  * Entities:
  * - "tool_ltigroupautoenrol > lti tools": course, name (creates an LTI 1.3 enrol_lti instance),
- * - "tool_ltigroupautoenrol > lti enrolments": user, tool (enrols through enrol_lti, fires the real event).
+ * - "tool_ltigroupautoenrol > lti enrolments": user, tool (enrols through enrol_lti, fires the real event);
+ *   optional: course (short name, if several courses have a tool of that name), status (active/suspended),
+ *   timestart, timeend (e.g. "##yesterday##").
  *
  * @package    tool_ltigroupautoenrol
  * @category   test
@@ -45,7 +47,7 @@ class behat_tool_ltigroupautoenrol_generator extends behat_generator_base {
                 'singular' => 'lti enrolment',
                 'datagenerator' => 'behat_lti_enrolment',
                 'required' => ['user', 'tool'],
-                'switchids' => ['user' => 'userid'],
+                'switchids' => ['user' => 'userid', 'course' => 'courseid'],
             ],
         ];
     }

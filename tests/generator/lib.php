@@ -55,16 +55,24 @@ class tool_ltigroupautoenrol_generator extends component_generator_base {
     }
 
     /**
-     * Behat: enrols a user through the LTI tool with the given name (user, tool).
+     * Behat: enrols a user through the LTI tool with the given name.
+     *
+     * Columns: user, tool (name of the enrolment instance); optional: courseid (when several courses have a tool of
+     * that name, e.g. after a course copy), status ("active" or "suspended"), timestart, timeend.
      *
      * @param array $data
      * @return void
      */
     public function create_behat_lti_enrolment(array $data): void {
         global $DB;
-        $enrolid = $DB->get_field('enrol', 'id', ['enrol' => 'lti', 'name' => $data['tool']], MUST_EXIST);
+        $conditions = ['enrol' => 'lti', 'name' => $data['tool']];
+        if (!empty($data['courseid'])) {
+            $conditions['courseid'] = $data['courseid'];
+        }
+        $enrolid = $DB->get_field('enrol', 'id', $conditions, MUST_EXIST);
         $tool = $DB->get_record('enrol_lti_tools', ['enrolid' => $enrolid], '*', MUST_EXIST);
-        $this->enrol_via_lti($tool, (int) $data['userid']);
+        $status = ($data['status'] ?? 'active') === 'suspended' ? ENROL_USER_SUSPENDED : ENROL_USER_ACTIVE;
+        $this->enrol_via_lti($tool, (int) $data['userid'], $status, (int) ($data['timestart'] ?? 0), (int) ($data['timeend'] ?? 0));
     }
 
     /**
@@ -82,7 +90,7 @@ class tool_ltigroupautoenrol_generator extends component_generator_base {
     }
 
     /**
-     * Enrols a user through the enrol_lti instance of a tool (fires user_enrolment_created).
+     * Enrols a user through the enrol_lti instance of a tool (fires user_enrolment_created) and assigns the learner role.
      *
      * @param stdClass $tool
      * @param int $userid
@@ -101,5 +109,9 @@ class tool_ltigroupautoenrol_generator extends component_generator_base {
         global $DB;
         $instance = $DB->get_record('enrol', ['id' => $tool->enrolid], '*', MUST_EXIST);
         enrol_get_plugin('lti')->enrol_user($instance, $userid, $instance->roleid ?: null, $timestart, $timeend, $status);
+        // Like an LTI 1.3 launch (enrol_lti tool_launch_service): the learner role is assigned after the enrolment.
+        if (!empty($tool->rolelearner) && !empty($tool->contextid)) {
+            role_assign((int) $tool->rolelearner, $userid, (int) $tool->contextid);
+        }
     }
 }

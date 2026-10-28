@@ -4,6 +4,8 @@
 
 Supported upgrade baselines: 0.1 (2024050100 - 2024090802), the published 1.0 (2024093000) and 1.0.1 (2024100600) and all versions up to 1.1 (2026030700). The original database schema of each baseline is kept in tests/fixtures (checked against the ZIPs published in the Moodle plugins directory); the PHPUnit tests upgrade from each of them, and the CI runs them on PostgreSQL and MariaDB. In addition, the CI job `upgrade-e2e` upgrades a real site from the published 1.0.1 exactly as described below.
 
+The upgrade to 1.2.1 (2026102701) has no upgrade step (no database or configuration change).
+
 The upgrade to 1.2 (2026100800, 2026100801, 2026102500)
 
 * adds the field "settings" to installations that were upgraded from 0.1 and removes the unused tool_groupautoenrol fields of 0.1 (0.1 never evaluated them),
@@ -27,6 +29,15 @@ Recommended procedure:
 Rollback: Moodle does not support downgrading a plugin. Restore the database backup together with the previous plugin code. Single removed rows can also be restored from the JSON backup files.
 
 # Changelog
+
+## 1.2.1 (2026102701)
+
+Family audit of 2026-10-27 (development SHA f92fd21), items GA-01 to GA-03. No database or configuration change: there is no upgrade step; the version bump only makes Moodle load the new event classes and language strings. Upgrading from 1.2.0 needs no preparation.
+
+- GA-03: two events with ids and counters only, so other plugins (e.g. tool_ltidiagnostics) can correlate group assignments read-only from the log; the plugin does not depend on any of them. `\tool_ltigroupautoenrol\event\group_assignment_completed` (per eligible new LTI enrolment; in the backfill per user with an added or failed membership) and `\tool_ltigroupautoenrol\event\group_assignment_failed` (memberships not added, an error of the enrolment observer, or an aborted backfill run of a tool). Contract and payload: docs/EVENTS.md. `validate_data()` rejects any key of "other" outside the contract, so no name, e-mail address or group name can be logged. Reporting never changes the outcome of an assignment. The privacy reason names the events (new string identifier `privacy:reason_events`, see "Language packs" in the README).
+- GA-02: the backfill prefetches the memberships of a batch with one query instead of one `groups_is_member()` query per user and group (no N+1 on the read path; a repeated run over assigned users needs a constant number of queries per batch). The batch is reduced for tools mapped to many groups, so a batch never prefetches more than 50,000 membership rows (`assignment_service::MAX_PREFETCH_ROWS`). Measured with 10,000 users on Moodle 4.5 and 5.3 with PostgreSQL and MariaDB (docs/performance.md, tests/load/backfill_scale.php, tests/load/run_scale.sh).
+- GA-02: PHPMD complexity reduced where tests cover the code: `tool_ltigroupautoenrol_upgrade_analyse()` (split into one function per check; new tests for the current schema and a missing table), `docs_test::test_workflow_references_exist()`, `backfill_task::execute()` and `assignment_service` (no count() in the loop condition). The remaining PHPMD findings and the CI policy for PHPMD (advisory, not a gate) are documented in docs/QUALITY.md.
+- GA-01: end-user acceptance scenarios (docs/ACCEPTANCE_SCENARIOS.md): Behat feature `ltigroupautoenrol_acceptance.feature` (two consumers, several groups, multiple enrolment, later backfill, expired enrolment, course backup/restore and duplication) and a Playwright spec with real LTI 1.3 launches from two consumer sites into one tool site (tests/playwright/e2e). Two Moodle core defects found on the way (enrol_lti backup omits the provisioning modes; launches of earlier participants into a course copy fail) are documented in docs/ACCEPTANCE.md and the README; they are not caused by this plugin.
 
 ## 1.2.0 (2026102700)
 

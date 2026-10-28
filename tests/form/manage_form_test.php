@@ -117,6 +117,19 @@ final class manage_form_test extends \advanced_testcase {
     }
 
     /**
+     * More values than a mapping may hold are rejected, even if every value is a group of the course.
+     */
+    public function test_too_many_values_are_rejected(): void {
+        $values = array_fill(0, \tool_ltigroupautoenrol\local\mapping::MAX_GROUPS_PER_TOOL + 1, (string) $this->group);
+        $form = $this->submit(['enable_enrol' => 1, 'groups_' . $this->tool->id => $values]);
+        $this->assertNull($form->get_data());
+        $this->assertArrayHasKey('groups_' . $this->tool->id, $form->validation([], []));
+        // The limit itself is accepted.
+        $form = $this->submit(['enable_enrol' => 1, 'groups_' . $this->tool->id => array_slice($values, 1)]);
+        $this->assertNotNull($form->get_data());
+    }
+
+    /**
      * A single scalar id (manipulated request instead of a list) is rejected.
      */
     public function test_scalar_group_is_rejected(): void {

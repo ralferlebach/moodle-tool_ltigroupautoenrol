@@ -44,6 +44,12 @@ final class assignment_result {
     public int $errors = 0;
 
     /**
+     * @var string Machine code of the first error ('' if none): a group_assignment_failed::CODE_* constant or the
+     * basename of an exception class. Not part of {@see to_array()}, so it is neither stored nor shown.
+     */
+    public string $errorcode = '';
+
+    /**
      * Adds the counters of another result to this one.
      *
      * @param assignment_result $other
@@ -55,6 +61,9 @@ final class assignment_result {
         $this->added += $other->added;
         $this->skipped += $other->skipped;
         $this->errors += $other->errors;
+        if ($this->errorcode === '') {
+            $this->errorcode = $other->errorcode;
+        }
         return $this;
     }
 

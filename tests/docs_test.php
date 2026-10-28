@@ -61,27 +61,7 @@ final class docs_test extends \advanced_testcase {
         if (!is_dir($workflows)) {
             $this->markTestSkipped('No repository checkout (release ZIP): .github/workflows is not shipped.');
         }
-        $references = [];
-        $files = array_merge([$dir . '/README.md', $dir . '/.gitattributes'], glob($dir . '/docs/*.md') ?: []);
-        foreach ($files as $file) {
-            if (!is_file($file) || basename($file) === 'CHANGES.md') {
-                continue;
-            }
-            foreach (file($file) as $number => $line) {
-                $where = basename($file) . ':' . ($number + 1);
-                // Paths and URLs of workflows, and workflow names in comments of .gitattributes.
-                preg_match_all('~(?:\.github|actions)/workflows/([\w.-]+\.ya?ml)~', $line, $matches);
-                foreach ($matches[1] as $name) {
-                    $references[] = [$name, $where];
-                }
-                if (basename($file) === '.gitattributes' && preg_match('/^\s*#/', $line)) {
-                    preg_match_all('/([\w.-]+\.ya?ml)/', $line, $matches);
-                    foreach ($matches[1] as $name) {
-                        $references[] = [$name, $where];
-                    }
-                }
-            }
-        }
+        $references = $this->collect_workflow_references($dir);
         $this->assertNotEmpty($references);
         foreach ($references as [$name, $where]) {
             $this->assertFileExists("$workflows/$name", "$where refers to a workflow that does not exist");
@@ -95,6 +75,46 @@ final class docs_test extends \advanced_testcase {
                 "README: CI badge of $branch"
             );
         }
+    }
+
+    /**
+     * Collects the workflow file names referenced by README.md, .gitattributes (comments) and docs/ (except CHANGES.md).
+     *
+     * @param string $dir Plugin directory.
+     * @return array[] Pairs [workflow file name, "file:line"].
+     */
+    private function collect_workflow_references(string $dir): array {
+        $references = [];
+        $files = array_merge([$dir . '/README.md', $dir . '/.gitattributes'], glob($dir . '/docs/*.md') ?: []);
+        foreach ($files as $file) {
+            if (!is_file($file) || basename($file) === 'CHANGES.md') {
+                continue;
+            }
+            foreach (file($file) as $number => $line) {
+                foreach ($this->workflow_names_in_line(basename($file), $line) as $name) {
+                    $references[] = [$name, basename($file) . ':' . ($number + 1)];
+                }
+            }
+        }
+        return $references;
+    }
+
+    /**
+     * Returns the workflow file names in one line: paths and URLs of workflows, and in comments of
+     * .gitattributes also bare workflow names.
+     *
+     * @param string $filename Base name of the file the line belongs to.
+     * @param string $line
+     * @return string[]
+     */
+    private function workflow_names_in_line(string $filename, string $line): array {
+        preg_match_all('~(?:\.github|actions)/workflows/([\w.-]+\.ya?ml)~', $line, $matches);
+        $names = $matches[1];
+        if ($filename === '.gitattributes' && preg_match('/^\s*#/', $line)) {
+            preg_match_all('/([\w.-]+\.ya?ml)/', $line, $matches);
+            $names = array_merge($names, $matches[1]);
+        }
+        return $names;
     }
 
     /**

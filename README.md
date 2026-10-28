@@ -4,7 +4,7 @@ moodle-tool_ltigroupautoenrol
 [![Moodle Plugin CI (main, released)](https://github.com/ralferlebach/moodle-tool_ltigroupautoenrol/actions/workflows/moodle-plugin-ci.yml/badge.svg?branch=main)](https://github.com/ralferlebach/moodle-tool_ltigroupautoenrol/actions/workflows/moodle-plugin-ci.yml?query=branch%3Amain)
 [![Moodle Plugin CI (development)](https://github.com/ralferlebach/moodle-tool_ltigroupautoenrol/actions/workflows/moodle-plugin-ci.yml/badge.svg?branch=development)](https://github.com/ralferlebach/moodle-tool_ltigroupautoenrol/actions/workflows/moodle-plugin-ci.yml?query=branch%3Adevelopment)
 
-Branches: `main` holds the released version, `development` the next one.
+Branches: `main` holds the released version, `development` the next one (see "Branch and release policy").
 
 Moodle admin tool plugin which automatically adds users to pre-defined groups when they are enrolled in a course through an LTI 1.3 tool. The groups are chosen per LTI tool, so one course can serve several LTI consumers and still put their users into separate groups (additive; see "How this plugin works / Pitfalls").
 
@@ -34,7 +34,17 @@ Install the plugin like any other plugin to folder
 
 See http://docs.moodle.org/en/Installing_plugins for details on installing Moodle plugins
 
-Upgrading from an earlier version of this plugin: please read the upgrade notes in docs/CHANGES.md first (backup, read-only pre-upgrade check, rollback).
+Upgrading from an earlier version of this plugin: please read the upgrade notes in docs/CHANGES.md first (backup, read-only pre-upgrade check, rollback). The update from 1.2.0 to 1.2.1 has no upgrade step (no database or configuration change); Moodle only registers the new events and language strings.
+
+The plugin has no dependency on other plugins. In particular it does not need any other plugin of the LTI tool family (see "LTI tool family").
+
+
+Branch and release policy
+-------------------------
+
+* `development` is the work branch: all changes, fixes and tests are made there, and every acceptance statement refers to an exact `development` commit and the CI run of that commit.
+* `main` is the release branch: it only receives a reviewed pull request from `development` after the functional acceptance by the maintainer (docs/ACCEPTANCE_SCENARIOS.md) and a green `development` CI run of the same commit; the full CI ("CI complete", release gate) then runs again on the exact `main` commit before a release is published. No changes are made directly on `main`.
+* The plugin has its own semantic version; it is released independently of the other plugins of the LTI tool family.
 
 
 Usage & Settings
@@ -95,8 +105,9 @@ Pitfalls:
 * **Group assignment is strictly additive - no automatic revocation.** The plugin only adds memberships and never removes any: not when the mapping is changed (members stay in the previously mapped group and are added to a new group only by the next enrolment or an "Assign existing LTI participants" run), not when the feature is disabled, not when an LTI tool is deleted and not when the plugin is uninstalled. Moodle core removes a user's group memberships only when the user loses their last enrolment in the course. If groups are used to separate consumers (group mode, restricted access), a changed mapping therefore does not withdraw access that was granted before; remove such memberships manually. Group memberships created by the plugin can always be removed manually by teachers.
 * **Only new enrolments are handled by the event.** Users who were enrolled before the configuration was saved, or whose enrolment becomes active later (start date in the future, suspension lifted), have to be assigned with "Assign existing LTI participants".
 * **Lifecycle:** When a course is deleted, its configuration is deleted. When an LTI enrolment method instance or a group is deleted, it is removed from the configuration. Existing group memberships are not touched by the plugin.
-* **Backup, restore and course copy:** The configuration is part of the course backup. On restore, its LTI tools and groups are mapped to the restored ones; pairs whose tool or group was not restored are dropped. Moodle restores the enrolment methods (and with them the LTI tools) only when they are included in the restore, and course settings into an existing course only with "Overwrite course configuration"; a course duplicated without users therefore has no LTI tools and no mapping. Restoring into a course with its own configuration keeps its on/off setting and adds the restored pairs.
-* **Errors never block an enrolment.** If a group membership can not be added for a new enrolment, the enrolment itself succeeds; the failure is reported in Moodle's debugging output (course and number only). The background assignment records failures in its status and is retried by the task API.
+* **Backup, restore and course copy:** The configuration is part of the course backup. On restore, its LTI tools and groups are mapped to the restored ones; pairs whose tool or group was not restored are dropped. Moodle restores the enrolment methods (and with them the LTI tools) only when they are included in the restore, and course settings into an existing course only with "Overwrite course configuration"; a course duplicated without users therefore has no LTI tools and no mapping. Restoring into a course with its own configuration keeps its on/off setting and adds the restored pairs. Moodle core (4.5 to 5.3) itself restores LTI 1.3 tools without their user provisioning modes, so launches into a restored or copied course fail until each "Publish as LTI tool" enrolment method of that course has been opened and saved once; core also restores no LTI user enrolments, and participants who had used a tool before can not launch into its copy (core error "Cannot create duplicate LTI user"). These are core limitations, not caused by this plugin (docs/ACCEPTANCE.md).
+* **Errors never block an enrolment.** If a group membership can not be added for a new enrolment, the enrolment itself succeeds; the failure is reported in Moodle's debugging output (course and number only) and as event "Group assignment of an LTI participant failed". The background assignment records failures in its status and is retried by the task API.
+* **Events (since 1.2.1).** Every assignment is reported as event "Group assignment of an LTI participant completed" (for the backfill only for participants whose memberships changed or failed), every failure as "Group assignment of an LTI participant failed". The events contain ids, counters and a machine code only; other plugins can read them from the log, the plugin does not depend on them. Contract: docs/EVENTS.md.
 * **Language packs:** Community translations from AMOS override the plugin's own language files. Strings whose meaning changed in 1.2 therefore got new identifiers, so outdated translations of 1.0.1/1.1 are not shown.
 
 
@@ -107,7 +118,7 @@ The plugin implements Moodle's null privacy provider. Data flows:
 
 * **Plugin table:** course settings (which LTI tool is mapped to which groups) and status, time and counters of the last "Assign existing LTI participants" run. No user data.
 * **Group memberships:** stored in Moodle core through the groups API; exported and deleted by Moodle's groups subsystem (core_group).
-* **Events and logs:** the plugin triggers no events of its own. Adding a membership triggers core's group_member_added event, which the standard log store records; it is covered by the log store's privacy provider.
+* **Events and logs:** the plugin triggers two events (group assignment completed / failed, since 1.2.1) with the course, the enrolment method, the user id, counters and a machine code - no names, e-mail addresses or group names. Adding a membership also triggers core's group_member_added event. The log stores record both and cover them with their privacy providers (export and deletion by user id).
 * **Background task:** course id, configuration fingerprint and preview time only.
 * **Debugging output and upgrade backups:** course ids, counters and course settings only.
 * **Course backups:** the course configuration only (on/off and tool to group mapping), no user data.
@@ -171,7 +182,16 @@ The continuous integration tests these combinations: Moodle 4.5 with PHP 8.1 and
 
 Release contract: the job "Release gate" passes only if all test cells, the upgrade test, the Playwright tests, the artefact check, the installation smoke test and the gate self-test are "success"; any other result (failure, cancelled, skipped, missing) fails it (the gate logic is .github/scripts/release_gate.sh, its fail-closed behaviour is checked by the job "Release gate self-test" in every run). Only then the candidate ZIP is published as the artifact `tool_ltigroupautoenrol-<commit>`; the artifact `candidate-…` is an unreleased intermediate. "CI complete" is the single status check to require in the branch protection of `main`. As long as Moodle 4.5 is supported, the PHPUnit tests keep the PHPUnit 9 conventions (@covers and @dataProvider annotations in docblocks).
 
-Tests: PHPUnit (incl. upgrade tests from the historical schemas, uninstall/reinstall, backup/restore and course duplication, query budgets), a real site upgrade from the published 1.0.1 on Moodle 4.5 and 5.3 with PostgreSQL and MariaDB (tests/upgrade), Behat (incl. axe accessibility checks) and Playwright browser tests on Moodle 4.5 and 5.3 (tests/playwright: page identity, axe, keyboard and focus, reflow at 200 %/400 % zoom and on a phone, German user interface, access denial).
+Tests: PHPUnit (incl. upgrade tests from the historical schemas, uninstall/reinstall, backup/restore, course duplication and course copy, query budgets, events), a real site upgrade from the published 1.0.1 on Moodle 4.5 and 5.3 with PostgreSQL and MariaDB (tests/upgrade), Behat (incl. axe accessibility checks) and Playwright browser tests on Moodle 4.5 and 5.3 (tests/playwright: page identity, axe, keyboard and focus, reflow at 200 %/400 % zoom and on a phone, German user interface, access denial).
+
+
+Acceptance and quality documents (repository only, not part of the release ZIP): docs/ACCEPTANCE_SCENARIOS.md (end-user scenarios for the functional acceptance by the maintainer, with Behat and two-site Playwright tests with real LTI 1.3 launches), docs/ACCEPTANCE.md (evidence per audit item), docs/EVENTS.md (event contract), docs/performance.md (measurements incl. 10,000 users), docs/QUALITY.md (PHPMD policy).
+
+
+LTI tool family
+---------------
+
+This plugin is the existing, independent member of a family of LTI plugins by the same maintainer: local_ltiidentity, ltisource_ltipseudonym, local_ltiaccountmerge, local_ltixsembed, tool_ltidiagnostics and local_lticompletionsync. Every plugin of the family is installed, versioned and released on its own; none of them is required by this plugin, and this plugin requires none of them. tool_ltidiagnostics can optionally read this plugin's events (docs/EVENTS.md); without it, nothing changes here.
 
 
 Translating this plugin

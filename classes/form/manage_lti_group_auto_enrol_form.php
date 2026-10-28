@@ -162,39 +162,81 @@ class manage_lti_group_auto_enrol_form extends moodleform {
      */
     public function validation($data, $files): array {
         $errors = parent::validation($data, $files);
-        $groups = $this->_customdata['groups'];
         // Group selects of tools that are not offered for this course (manipulated request) are rejected,
         // not silently dropped.
+        if ($this->has_foreign_tool_select()) {
+            $errors['enable_enrol'] = get_string('error_unknowntool', 'tool_ltigroupautoenrol');
+        }
+        foreach (array_keys($this->_customdata['tools']) as $toolid) {
+            $name = self::get_element_name((int) $toolid);
+            if (!self::is_valid_selection($this->_form->getSubmitValue($name), $this->_customdata['groups'])) {
+                $errors[$name] = get_string('error_invalidgroups', 'tool_ltigroupautoenrol');
+            }
+        }
+        return $errors;
+    }
+
+    /**
+     * Whether the raw submission contains a group select of a tool that is not offered for this course.
+     *
+     * @return bool
+     */
+    private function has_foreign_tool_select(): bool {
         foreach (array_keys($this->_form->getSubmitValues()) as $field) {
             if (
                 preg_match('/^groups_(\d+)$/', (string) $field, $matches)
                 && !isset($this->_customdata['tools'][(int) $matches[1]])
             ) {
-                $errors['enable_enrol'] = get_string('error_unknowntool', 'tool_ltigroupautoenrol');
-                break;
+                return true;
             }
         }
-        foreach (array_keys($this->_customdata['tools']) as $toolid) {
-            $name = self::get_element_name((int) $toolid);
-            $raw = $this->_form->getSubmitValue($name);
-            // Core submits a placeholder (hidden input) for a multi-select with nothing selected;
-            // setType(PARAM_INT) cleans it to 0 before validation.
-            if ($raw === null || $raw === self::EMPTY_MULTISELECT || $raw === 0 || $raw === '0') {
-                continue;
-            }
-            if (!is_array($raw) || count($raw) > mapping::MAX_GROUPS_PER_TOOL) {
-                $errors[$name] = get_string('error_invalidgroups', 'tool_ltigroupautoenrol');
-                continue;
-            }
-            $raw = array_filter($raw, fn($value): bool => $value !== self::EMPTY_MULTISELECT);
-            foreach ($raw as $groupid) {
-                if (!is_scalar($groupid) || !ctype_digit((string) $groupid) || !isset($groups[(int) $groupid])) {
-                    $errors[$name] = get_string('error_invalidgroups', 'tool_ltigroupautoenrol');
-                    break;
-                }
+        return false;
+    }
+
+    /**
+     * Whether the raw value of one group select only contains groups of the course (or nothing).
+     *
+     * @param mixed $raw Raw submitted value.
+     * @param array $groups Groups of the course keyed by id.
+     * @return bool
+     */
+    private static function is_valid_selection($raw, array $groups): bool {
+        if (self::is_empty_selection($raw)) {
+            return true;
+        }
+        if (!is_array($raw) || count($raw) > mapping::MAX_GROUPS_PER_TOOL) {
+            return false;
+        }
+        foreach ($raw as $groupid) {
+            if ($groupid !== self::EMPTY_MULTISELECT && !self::is_course_group($groupid, $groups)) {
+                return false;
             }
         }
-        return $errors;
+        return true;
+    }
+
+    /**
+     * Whether a raw value stands for "nothing selected".
+     *
+     * Core submits a placeholder (hidden input) for a multi-select with nothing selected; setType(PARAM_INT)
+     * cleans it to 0 before validation.
+     *
+     * @param mixed $raw
+     * @return bool
+     */
+    private static function is_empty_selection($raw): bool {
+        return $raw === null || $raw === self::EMPTY_MULTISELECT || $raw === 0 || $raw === '0';
+    }
+
+    /**
+     * Whether a submitted value is the id of a group of the course.
+     *
+     * @param mixed $groupid
+     * @param array $groups Groups of the course keyed by id.
+     * @return bool
+     */
+    private static function is_course_group($groupid, array $groups): bool {
+        return is_scalar($groupid) && ctype_digit((string) $groupid) && isset($groups[(int) $groupid]);
     }
 
     /**

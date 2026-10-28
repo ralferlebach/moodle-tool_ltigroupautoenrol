@@ -41,6 +41,10 @@ use tool_ltigroupautoenrol\local\config_repository;
  * @covers     ::tool_ltigroupautoenrol_upgrade_add_backfill_status
  * @covers     ::tool_ltigroupautoenrol_upgrade_backup
  * @covers     ::tool_ltigroupautoenrol_upgrade_analyse
+ * @covers     ::tool_ltigroupautoenrol_upgrade_analyse_legacy
+ * @covers     ::tool_ltigroupautoenrol_upgrade_analyse_orphans
+ * @covers     ::tool_ltigroupautoenrol_upgrade_analyse_duplicates
+ * @covers     ::tool_ltigroupautoenrol_upgrade_analyse_mappings
  */
 final class upgradelib_test extends \advanced_testcase {
     /**
@@ -328,5 +332,43 @@ final class upgradelib_test extends \advanced_testcase {
         $this->assertStringContainsString('Rows with configured legacy values (will be backed up and removed): 1', $report);
         $this->assertStringContainsString('Field "settings" present: no', $report);
         $this->assertStringContainsString("Courses with duplicate configurations: 1 ({$course->id})", $report);
+    }
+
+    /**
+     * The analysis of a current schema reports orphans and invalid mappings, line by line and in order.
+     */
+    public function test_analyse_current_schema(): void {
+        global $DB;
+        $course = $this->getDataGenerator()->create_course();
+        $other = $this->getDataGenerator()->create_course();
+        $DB->insert_record('tool_ltigroupautoenrol', (object) ['courseid' => $course->id, 'settings' => '{not json']);
+        $DB->insert_record('tool_ltigroupautoenrol', (object) ['courseid' => $other->id, 'settings' => '{"1":[2]}']);
+        $DB->insert_record('tool_ltigroupautoenrol', (object) ['courseid' => $other->id + 1000, 'settings' => '']);
+        $before = $DB->get_records('tool_ltigroupautoenrol');
+
+        $report = tool_ltigroupautoenrol_upgrade_analyse();
+
+        $this->assertEquals($before, $DB->get_records('tool_ltigroupautoenrol'));
+        $this->assertSame([
+            'Rows: 3',
+            'Legacy 0.1 fields present: none',
+            'Field "settings" present: yes',
+            'Configurations of deleted courses (will be backed up and removed): 1',
+            'Courses with duplicate configurations: 0; rows to be backed up and removed: 0',
+            "Courses with invalid mappings (kept, ignored at runtime): {$course->id}",
+        ], $report);
+    }
+
+    /**
+     * Without the plugin table the analysis says so and checks nothing else.
+     */
+    public function test_analyse_without_table(): void {
+        global $DB;
+        $DB->get_manager()->drop_table(new \xmldb_table('tool_ltigroupautoenrol'));
+
+        $this->assertSame(
+            ['Table tool_ltigroupautoenrol does not exist (plugin not installed).'],
+            tool_ltigroupautoenrol_upgrade_analyse()
+        );
     }
 }
